@@ -257,3 +257,61 @@ async def test_generate_image_tool_empty_api_key():
     assert result["success"] is False
     assert "error" in result
     assert "API key is required" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_edit_image_tool():
+    """Test edit_image_tool with URL output format."""
+    from src.tools.edit import edit_image_tool
+
+    with patch('src.tools.edit.OpenAIClient') as mock_client_class, \
+         patch('src.tools.edit.ImageHandler') as mock_handler_class:
+
+        # Setup mocks
+        mock_client = Mock()
+        mock_client.edit_image = AsyncMock(return_value="https://example.com/edited.png")
+        mock_client_class.return_value = mock_client
+
+        mock_handler = Mock()
+        mock_handler.download_image = AsyncMock(return_value={
+            "format": "url",
+            "data": "https://example.com/edited.png"
+        })
+        mock_handler_class.return_value = mock_handler
+
+        # Call the tool
+        result = await edit_image_tool(
+            image_input="https://example.com/original.png",
+            prompt="Make the sky blue",
+            output_format="url",
+            api_key="test_api_key"
+        )
+
+        # Assertions
+        assert result["success"] is True
+        assert result["format"] == "url"
+        assert result["data"] == "https://example.com/edited.png"
+        assert result["metadata"]["model"] == "gpt-4o"
+        assert result["metadata"]["size"] == "1024x1024"
+        assert result["metadata"]["quality"] == "standard"
+
+        # Verify client was called correctly
+        mock_client_class.assert_called_once_with(
+            api_key="test_api_key",
+            base_url="https://api.openai.com/v1"
+        )
+        mock_client.edit_image.assert_called_once_with(
+            image_url="https://example.com/original.png",
+            prompt="Make the sky blue",
+            model="gpt-4o",
+            size="1024x1024",
+            quality="standard"
+        )
+
+        # Verify handler was called correctly
+        mock_handler_class.assert_called_once_with(save_directory="./images")
+        mock_handler.download_image.assert_called_once_with(
+            url="https://example.com/edited.png",
+            output_format="url",
+            output_path=None
+        )
