@@ -1,7 +1,6 @@
 import logging
 from typing import Optional, Literal, Dict, Any
-from src.openai_client import OpenAIClient
-from src.image_handler import ImageHandler
+from src.tools.common import process_image_request
 
 
 logger = logging.getLogger(__name__)
@@ -40,55 +39,25 @@ async def generate_image_tool(
             - metadata: dict with model, size, quality
             - error: error message if success is False
     """
-    # Validate API key
-    if not api_key:
-        logger.error("API key is required")
-        return {"success": False, "error": "API key is required"}
+    logger.info(f"Generating image with prompt: {prompt[:50]}...")
 
-    try:
-        logger.info(f"Generating image with prompt: {prompt[:50]}...")
-        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}, output_format={output_format}")
-
-        # Create OpenAI client
-        client = OpenAIClient(api_key=api_key, base_url=base_url)
-
-        # Generate image and get URL
-        image_url = await client.generate_image(
+    async def api_call(client):
+        return await client.generate_image(
             prompt=prompt,
             model=model,
             size=size,
             quality=quality
         )
 
-        logger.info(f"Image generated successfully: {image_url}")
-
-        # Create ImageHandler to process output format
-        handler = ImageHandler(save_directory=save_directory)
-
-        # Download/convert image to requested format
-        result = await handler.download_image(
-            url=image_url,
-            output_format=output_format,
-            output_path=output_path
-        )
-
-        logger.info(f"Image processed to {output_format} format successfully")
-
-        # Return success response with metadata
-        return {
-            "success": True,
-            "format": result["format"],
-            "data": result["data"],
-            "metadata": {
-                "model": model,
-                "size": size,
-                "quality": quality
-            }
-        }
-
-    except (ValueError, Exception) as e:
-        logger.error(f"Error generating image: {e}", exc_info=True)
-        return {
-            "success": False,
-            "error": str(e)
-        }
+    return await process_image_request(
+        api_key=api_key,
+        base_url=base_url,
+        save_directory=save_directory,
+        output_format=output_format,
+        output_path=output_path,
+        model=model,
+        size=size,
+        quality=quality,
+        api_call=api_call,
+        operation_name="Generating"
+    )
