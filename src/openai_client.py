@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import openai
 
 
@@ -25,6 +25,69 @@ class OpenAIClient:
         )
         logger.info(f"Initialized OpenAI client with base_url={base_url}")
 
+    def _get_image_generation_tool(self, size: str, quality: str) -> List[Dict[str, Any]]:
+        """Get the image generation tool definition.
+
+        Args:
+            size: Image size (e.g., "1024x1024", "1792x1024", "1024x1792")
+            quality: Image quality ("standard" or "hd")
+
+        Returns:
+            List containing the tool definition
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "image_generation",
+                    "description": "Generate or edit an image based on a text prompt",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {"type": "string"},
+                            "size": {"type": "string", "default": size},
+                            "quality": {"type": "string", "default": quality}
+                        },
+                        "required": ["prompt"]
+                    }
+                }
+            }
+        ]
+
+    def _extract_image_url_from_response(self, response: Any) -> str:
+        """Extract image URL from OpenAI API response.
+
+        Args:
+            response: OpenAI API response object
+
+        Returns:
+            URL of the generated/edited image
+
+        Raises:
+            ValueError: If no image URL is found in the response
+        """
+        if not response.choices or not response.choices[0].message.tool_calls:
+            logger.error("No tool calls in response")
+            raise ValueError("No image generated")
+
+        tool_call = response.choices[0].message.tool_calls[0]
+        if tool_call.function.name != "image_generation":
+            logger.error(f"Unexpected tool call: {tool_call.function.name}")
+            raise ValueError("No image generated")
+
+        # Parse tool call arguments
+        try:
+            arguments = json.loads(tool_call.function.arguments)
+            image_url = arguments.get("image_url")
+            if not image_url:
+                logger.error("No image_url in tool call arguments")
+                raise ValueError("No image generated")
+
+            return image_url
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse tool call arguments: {e}")
+            raise ValueError("No image generated")
+
     async def generate_image(
         self,
         prompt: str,
@@ -45,65 +108,38 @@ class OpenAIClient:
 
         Raises:
             ValueError: If no image is generated
+            openai.APIError: If the API request fails
+            openai.APIConnectionError: If connection to API fails
         """
         logger.info(f"Generating image with prompt: {prompt[:50]}...")
         logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
 
-        # Define the image_generation tool
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "image_generation",
-                    "description": "Generate an image based on a text prompt",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "prompt": {"type": "string"},
-                            "size": {"type": "string"},
-                            "quality": {"type": "string"}
-                        },
-                        "required": ["prompt"]
-                    }
-                }
-            }
-        ]
+        # Get tool definition with size and quality
+        tools = self._get_image_generation_tool(size, quality)
 
-        # Call Responses API
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            tools=tools
-        )
-
-        # Extract image URL from tool call
-        if not response.choices or not response.choices[0].message.tool_calls:
-            logger.error("No tool calls in response")
-            raise ValueError("No image generated")
-
-        tool_call = response.choices[0].message.tool_calls[0]
-        if tool_call.function.name != "image_generation":
-            logger.error(f"Unexpected tool call: {tool_call.function.name}")
-            raise ValueError("No image generated")
-
-        # Parse tool call arguments
+        # Call Responses API with error handling
         try:
-            arguments = json.loads(tool_call.function.arguments)
-            image_url = arguments.get("image_url")
-            if not image_url:
-                logger.error("No image_url in tool call arguments")
-                raise ValueError("No image generated")
+            response = await self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                tools=tools
+            )
+        except openai.APIConnectionError as e:
+            logger.error(f"Failed to connect to OpenAI API: {e}")
+            raise
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error: {e}")
+            raise
 
-            logger.info(f"Successfully generated image: {image_url}")
-            return image_url
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse tool call arguments: {e}")
-            raise ValueError("No image generated")
+        # Extract image URL from response
+        image_url = self._extract_image_url_from_response(response)
+        logger.info(f"Successfully generated image: {image_url}")
+        return image_url
 
     async def edit_image(
         self,
@@ -127,71 +163,44 @@ class OpenAIClient:
 
         Raises:
             ValueError: If no image is generated
+            openai.APIError: If the API request fails
+            openai.APIConnectionError: If connection to API fails
         """
         logger.info(f"Editing image with prompt: {prompt[:50]}...")
         logger.debug(f"Parameters: image_url={image_url}, model={model}, size={size}, quality={quality}")
 
-        # Define the image_generation tool
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "image_generation",
-                    "description": "Generate or edit an image based on a text prompt",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "prompt": {"type": "string"},
-                            "size": {"type": "string"},
-                            "quality": {"type": "string"}
-                        },
-                        "required": ["prompt"]
-                    }
-                }
-            }
-        ]
+        # Get tool definition with size and quality
+        tools = self._get_image_generation_tool(size, quality)
 
-        # Call Responses API with image in messages
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": image_url}
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ]
-                }
-            ],
-            tools=tools
-        )
-
-        # Extract image URL from tool call
-        if not response.choices or not response.choices[0].message.tool_calls:
-            logger.error("No tool calls in response")
-            raise ValueError("No image generated")
-
-        tool_call = response.choices[0].message.tool_calls[0]
-        if tool_call.function.name != "image_generation":
-            logger.error(f"Unexpected tool call: {tool_call.function.name}")
-            raise ValueError("No image generated")
-
-        # Parse tool call arguments
+        # Call Responses API with image in messages and error handling
         try:
-            arguments = json.loads(tool_call.function.arguments)
-            edited_image_url = arguments.get("image_url")
-            if not edited_image_url:
-                logger.error("No image_url in tool call arguments")
-                raise ValueError("No image generated")
+            response = await self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url}
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ],
+                tools=tools
+            )
+        except openai.APIConnectionError as e:
+            logger.error(f"Failed to connect to OpenAI API: {e}")
+            raise
+        except openai.APIError as e:
+            logger.error(f"OpenAI API error: {e}")
+            raise
 
-            logger.info(f"Successfully edited image: {edited_image_url}")
-            return edited_image_url
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse tool call arguments: {e}")
-            raise ValueError("No image generated")
+        # Extract image URL from response
+        edited_image_url = self._extract_image_url_from_response(response)
+        logger.info(f"Successfully edited image: {edited_image_url}")
+        return edited_image_url
