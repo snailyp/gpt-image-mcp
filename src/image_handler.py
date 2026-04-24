@@ -23,6 +23,7 @@ class ImageHandler:
         """
         self.save_directory = Path(save_directory)
         self.download_retry = download_retry
+        self.save_directory.mkdir(parents=True, exist_ok=True)
 
     async def download_image(
         self,
