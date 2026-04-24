@@ -1,0 +1,29 @@
+{
+  "openai": {
+    "api_key": "",
+    "base_url": "https://api.openai.com/v1",
+    "default_model": "gpt-4o",
+    "timeout": 60
+  },
+  "image": {
+    "default_size": "1024x1024",
+    "default_quality": "standard",
+    "default_output_format": "url",
+    "save_directory": "./images",
+    "download_retry": 3
+  },
+  "server": {
+    "name": "gpt-image-mcp",
+    "version": "1.0.0",
+    "transport": "stdio"
+  },
+  "http": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "endpoint": "/mcp"
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  }
+}
