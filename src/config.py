@@ -1,10 +1,9 @@
 """Configuration management with multi-layer priority loading."""
-import os
 import json
 from pathlib import Path
-from typing import Optional
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional, Dict, Any, Tuple, Type
+from pydantic import BaseModel, Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 
 
 class OpenAIConfig(BaseModel):
@@ -44,6 +43,29 @@ class LoggingConfig(BaseModel):
     format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
+class JsonConfigSource(PydanticBaseSettingsSource):
+    """Custom settings source for loading from JSON file."""
+
+    def __init__(self, settings_cls: Type[BaseSettings], json_file: Optional[str] = None):
+        super().__init__(settings_cls)
+        self.json_file = json_file
+        self._data: Dict[str, Any] = {}
+        if json_file and Path(json_file).exists():
+            with open(json_file, 'r') as f:
+                self._data = json.load(f)
+
+    def get_field_value(self, field_name: str, field_info: Any) -> Tuple[Any, str, bool]:
+        """Get field value from JSON data."""
+        _ = field_info  # Unused but required by interface
+        if field_name in self._data:
+            return self._data[field_name], field_name, False
+        return None, field_name, False
+
+    def __call__(self) -> Dict[str, Any]:
+        """Return the loaded JSON data."""
+        return self._data
+
+
 class Config(BaseSettings):
     """Main configuration class with multi-layer loading support."""
     model_config = SettingsConfigDict(
@@ -58,6 +80,26 @@ class Config(BaseSettings):
     http: HTTPConfig = Field(default_factory=HTTPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        """
+        Customize settings sources priority.
+        Priority order: init_settings (CLI args) > env_settings > json_file > defaults
+        """
+        _ = dotenv_settings  # Unused but required by interface
+        json_file = getattr(settings_cls, '_json_config_file', None)
+        json_source = JsonConfigSource(settings_cls, json_file)
+
+        # Return sources in priority order (first = highest priority)
+        return (init_settings, env_settings, json_source, file_secret_settings)
+
 
 def load_config(
     config_file: Optional[str] = None,
@@ -66,54 +108,46 @@ def load_config(
     """
     Load configuration with priority: CLI args > env vars > config file > defaults.
 
+    Environment variables use double underscore (__) as delimiter for nested fields:
+    - OPENAI__API_KEY maps to openai.api_key
+    - HTTP__PORT maps to http.port
+    - LOGGING__LEVEL maps to logging.level
+
     Args:
         config_file: Path to JSON configuration file
-        cli_args: Dictionary of CLI arguments to override config
+        cli_args: Dictionary of CLI arguments to override config (e.g., {"openai.api_key": "value"})
 
     Returns:
         Config: Loaded configuration instance
+
+    Raises:
+        ValueError: If type conversion fails for environment variables or CLI args
     """
-    config_data = {}
+    # Set the JSON config file path as a class attribute for the custom source
+    Config._json_config_file = config_file
 
-    # Step 1: Load from config file if provided
-    if config_file and Path(config_file).exists():
-        with open(config_file, 'r') as f:
-            config_data = json.load(f)
-
-    # Step 2: Create base config from file data
-    config = Config(**config_data)
-
-    # Step 3: Override with environment variables
-    # Handle OPENAI_API_KEY
-    if "OPENAI_API_KEY" in os.environ:
-        config.openai.api_key = os.environ["OPENAI_API_KEY"]
-
-    # Handle LOG_LEVEL
-    if "LOG_LEVEL" in os.environ:
-        config.logging.level = os.environ["LOG_LEVEL"]
-
-    # Handle OPENAI_BASE_URL
-    if "OPENAI_BASE_URL" in os.environ:
-        config.openai.base_url = os.environ["OPENAI_BASE_URL"]
-
-    # Handle MCP_TRANSPORT
-    if "MCP_TRANSPORT" in os.environ:
-        config.server.transport = os.environ["MCP_TRANSPORT"]
-
-    # Handle MCP_HTTP_PORT
-    if "MCP_HTTP_PORT" in os.environ:
-        config.http.port = int(os.environ["MCP_HTTP_PORT"])
-
-    # Step 4: Override with CLI args if provided
+    # Prepare init_kwargs for CLI args
+    init_kwargs = {}
     if cli_args:
+        # Convert dot-notation CLI args to nested dict structure
         for key, value in cli_args.items():
             if '.' in key:
                 section, field = key.split('.', 1)
-                if hasattr(config, section):
-                    section_obj = getattr(config, section)
-                    if hasattr(section_obj, field):
-                        setattr(section_obj, field, value)
-            elif hasattr(config, key):
-                setattr(config, key, value)
+                if section not in init_kwargs:
+                    init_kwargs[section] = {}
+                # Type conversion will be handled by pydantic
+                init_kwargs[section][field] = value
+            else:
+                init_kwargs[key] = value
+
+    # Create config with proper priority: CLI args > env vars > file > defaults
+    try:
+        config = Config(**init_kwargs)
+    except (ValueError, ValidationError) as e:
+        raise ValueError(f"Configuration error: {e}") from e
+    finally:
+        # Clean up the class attribute
+        if hasattr(Config, '_json_config_file'):
+            delattr(Config, '_json_config_file')
 
     return config
