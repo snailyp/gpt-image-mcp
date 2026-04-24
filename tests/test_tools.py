@@ -242,3 +242,18 @@ async def test_generate_image_tool_with_custom_base_url():
             api_key="test_api_key",
             base_url="https://custom.api.com/v1"
         )
+
+
+@pytest.mark.asyncio
+async def test_generate_image_tool_empty_api_key():
+    """Test generate_image_tool with empty API key."""
+    # Call the tool with empty API key
+    result = await generate_image_tool(
+        prompt="This should fail",
+        api_key=""
+    )
+
+    # Assertions
+    assert result["success"] is False
+    assert "error" in result
+    assert "API key is required" in result["error"]

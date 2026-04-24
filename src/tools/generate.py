@@ -40,6 +40,11 @@ async def generate_image_tool(
             - metadata: dict with model, size, quality
             - error: error message if success is False
     """
+    # Validate API key
+    if not api_key:
+        logger.error("API key is required")
+        return {"success": False, "error": "API key is required"}
+
     try:
         logger.info(f"Generating image with prompt: {prompt[:50]}...")
         logger.debug(f"Parameters: model={model}, size={size}, quality={quality}, output_format={output_format}")
@@ -81,8 +86,8 @@ async def generate_image_tool(
             }
         }
 
-    except Exception as e:
-        logger.error(f"Error generating image: {e}")
+    except (ValueError, Exception) as e:
+        logger.error(f"Error generating image: {e}", exc_info=True)
         return {
             "success": False,
             "error": str(e)
