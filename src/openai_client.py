@@ -30,8 +30,7 @@ class OpenAIClient:
         prompt: str,
         model: str = "gpt-4o",
         size: str = "1024x1024",
-        quality: str = "standard",
-        style: Optional[str] = None
+        quality: str = "standard"
     ) -> str:
         """Generate an image using OpenAI Responses API.
 
@@ -40,7 +39,6 @@ class OpenAIClient:
             model: Model to use for generation
             size: Image size (e.g., "1024x1024", "1792x1024", "1024x1792")
             quality: Image quality ("standard" or "hd")
-            style: Image style ("vivid" or "natural")
 
         Returns:
             URL of the generated image
@@ -49,16 +47,7 @@ class OpenAIClient:
             ValueError: If no image is generated
         """
         logger.info(f"Generating image with prompt: {prompt[:50]}...")
-        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}, style={style}")
-
-        # Build tool parameters
-        tool_params = {
-            "prompt": prompt,
-            "size": size,
-            "quality": quality
-        }
-        if style:
-            tool_params["style"] = style
+        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
 
         # Define the image_generation tool
         tools = [
@@ -72,8 +61,7 @@ class OpenAIClient:
                         "properties": {
                             "prompt": {"type": "string"},
                             "size": {"type": "string"},
-                            "quality": {"type": "string"},
-                            "style": {"type": "string"}
+                            "quality": {"type": "string"}
                         },
                         "required": ["prompt"]
                     }
@@ -87,11 +75,10 @@ class OpenAIClient:
             messages=[
                 {
                     "role": "user",
-                    "content": f"Generate an image: {prompt}"
+                    "content": prompt
                 }
             ],
-            tools=tools,
-            tool_choice={"type": "function", "function": {"name": "image_generation"}}
+            tools=tools
         )
 
         # Extract image URL from tool call
@@ -155,7 +142,6 @@ class OpenAIClient:
                         "type": "object",
                         "properties": {
                             "prompt": {"type": "string"},
-                            "image": {"type": "string"},
                             "size": {"type": "string"},
                             "quality": {"type": "string"}
                         },
@@ -178,13 +164,12 @@ class OpenAIClient:
                         },
                         {
                             "type": "text",
-                            "text": f"Edit this image: {prompt}"
+                            "text": prompt
                         }
                     ]
                 }
             ],
-            tools=tools,
-            tool_choice={"type": "function", "function": {"name": "image_generation"}}
+            tools=tools
         )
 
         # Extract image URL from tool call
