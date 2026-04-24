@@ -553,3 +553,32 @@ async def test_edit_image_tool_empty_image_input():
     assert result["success"] is False
     assert "error" in result
     assert "Image input is required" in result["error"]
+
+
+def test_get_server_info_tool():
+    """Test get_server_info_tool returns correct server metadata."""
+    from src.tools.info import get_server_info_tool
+
+    # Call the tool with custom parameters
+    result = get_server_info_tool(
+        server_name="test-server",
+        server_version="2.0.0",
+        transport="http",
+        default_model="gpt-4-turbo",
+        default_size="512x512"
+    )
+
+    # Assert basic metadata matches input
+    assert result["name"] == "test-server"
+    assert result["version"] == "2.0.0"
+    assert result["transport"] == "http"
+
+    # Assert supported models includes gpt-4o
+    assert "gpt-4o" in result["supported_models"]
+
+    # Assert supported formats includes url
+    assert "url" in result["supported_formats"]
+
+    # Assert config contains default values
+    assert result["config"]["default_model"] == "gpt-4-turbo"
+    assert result["config"]["default_size"] == "512x512"
