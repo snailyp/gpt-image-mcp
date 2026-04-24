@@ -2,7 +2,8 @@ import logging
 import base64
 import uuid
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
+from urllib.parse import urlparse
 import httpx
 
 
@@ -26,7 +27,8 @@ class ImageHandler:
     async def download_image(
         self,
         url: str,
-        output_format: Literal["url", "file", "base64"] = "url"
+        output_format: Literal["url", "file", "base64"] = "url",
+        output_path: Optional[str] = None
     ) -> dict:
         """
         Download an image and return it in the specified format.
@@ -34,6 +36,7 @@ class ImageHandler:
         Args:
             url: URL of the image to download
             output_format: Output format (url, file, or base64)
+            output_path: Optional custom path for file output
 
         Returns:
             Dictionary with format and data keys
@@ -45,7 +48,7 @@ class ImageHandler:
         image_data = await self._fetch_image(url)
 
         if output_format == "file":
-            file_path = await self._save_image(image_data, url)
+            file_path = await self._save_image(image_data, url, output_path)
             return {"format": "file", "data": str(file_path)}
 
         elif output_format == "base64":
@@ -77,26 +80,33 @@ class ImageHandler:
 
         raise Exception(f"Failed to download image after {self.download_retry} attempts: {last_error}")
 
-    async def _save_image(self, image_data: bytes, url: str) -> Path:
+    async def _save_image(self, image_data: bytes, url: str, output_path: Optional[str] = None) -> Path:
         """
         Save image data to disk.
 
         Args:
             image_data: Image bytes to save
             url: Original URL (used to determine extension)
+            output_path: Optional custom path for the output file
 
         Returns:
             Path to saved file
         """
-        # Create directory if it doesn't exist
-        self.save_directory.mkdir(parents=True, exist_ok=True)
+        # If custom output path is provided, use it
+        if output_path:
+            file_path = Path(output_path)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # Create directory if it doesn't exist
+            self.save_directory.mkdir(parents=True, exist_ok=True)
 
-        # Determine file extension from URL
-        extension = Path(url).suffix or ".png"
+            # Determine file extension from URL using urlparse
+            parsed_url = urlparse(url)
+            extension = Path(parsed_url.path).suffix or ".png"
 
-        # Generate unique filename
-        filename = f"{uuid.uuid4()}{extension}"
-        file_path = self.save_directory / filename
+            # Generate unique filename
+            filename = f"{uuid.uuid4()}{extension}"
+            file_path = self.save_directory / filename
 
         # Write file
         file_path.write_bytes(image_data)

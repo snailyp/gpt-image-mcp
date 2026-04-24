@@ -65,3 +65,52 @@ async def test_download_retry_exhausted():
 
         with pytest.raises(Exception, match="Failed to download image after 3 attempts"):
             await handler.download_image("https://example.com/image.png", output_format="base64")
+
+
+@pytest.mark.asyncio
+async def test_url_format_passthrough():
+    handler = ImageHandler(save_directory="./test_images", download_retry=3)
+
+    result = await handler.download_image("https://example.com/image.png", output_format="url")
+
+    assert result["format"] == "url"
+    assert result["data"] == "https://example.com/image.png"
+
+
+@pytest.mark.asyncio
+async def test_directory_creation():
+    handler = ImageHandler(save_directory="./test_images/nested/path", download_retry=3)
+
+    with patch('httpx.AsyncClient.get') as mock_get:
+        mock_response = Mock()
+        mock_response.content = b"fake_image_data"
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        result = await handler.download_image("https://example.com/image.png", output_format="file")
+
+        assert result["format"] == "file"
+        # Use Path to normalize path separators for cross-platform compatibility
+        assert "test_images" in result["data"] and "nested" in result["data"] and "path" in result["data"]
+        # Verify directory was created
+        assert Path("./test_images/nested/path").exists()
+
+
+@pytest.mark.asyncio
+async def test_url_with_query_parameters():
+    handler = ImageHandler(save_directory="./test_images", download_retry=3)
+
+    with patch('httpx.AsyncClient.get') as mock_get:
+        mock_response = Mock()
+        mock_response.content = b"fake_image_data"
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        result = await handler.download_image(
+            "https://example.com/image.jpg?size=large&format=jpeg",
+            output_format="file"
+        )
+
+        assert result["format"] == "file"
+        # Verify the file has .jpg extension despite query parameters
+        assert result["data"].endswith(".jpg")
