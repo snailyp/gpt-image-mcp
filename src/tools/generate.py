@@ -15,7 +15,11 @@ async def generate_image_tool(
     output_path: Optional[str] = None,
     api_key: str = "",
     base_url: str = "https://api.openai.com/v1",
-    save_directory: str = "./images"
+    save_directory: str = "./images",
+    cloudflare_auth_code: str = "",
+    cloudflare_api_url: str = "",
+    cloudflare_upload_folder: str = "",
+    auto_upload_to_cloudflare: bool = True
 ) -> Dict[str, Any]:
     """
     Generate an image using OpenAI API and return it in the specified format.
@@ -30,6 +34,10 @@ async def generate_image_tool(
         api_key: OpenAI API key
         base_url: Base URL for OpenAI API (default: "https://api.openai.com/v1")
         save_directory: Directory to save images (default: "./images")
+        cloudflare_auth_code: Cloudflare authentication code
+        cloudflare_api_url: Cloudflare API URL
+        cloudflare_upload_folder: Cloudflare upload folder
+        auto_upload_to_cloudflare: Whether to auto-upload to Cloudflare when output_format is url
 
     Returns:
         Dictionary with:
@@ -40,6 +48,16 @@ async def generate_image_tool(
             - error: error message if success is False
     """
     logger.info(f"Generating image with prompt: {prompt[:50]}...")
+
+    # Construct CloudflareConfig if credentials provided
+    cloudflare_config = None
+    if cloudflare_auth_code and cloudflare_api_url:
+        from src.config import CloudflareConfig
+        cloudflare_config = CloudflareConfig(
+            auth_code=cloudflare_auth_code,
+            api_url=cloudflare_api_url,
+            upload_folder=cloudflare_upload_folder
+        )
 
     async def api_call(client):
         return await client.generate_image(
@@ -59,5 +77,7 @@ async def generate_image_tool(
         size=size,
         quality=quality,
         api_call=api_call,
-        operation_name="Generating"
+        operation_name="Generating",
+        cloudflare_config=cloudflare_config,
+        auto_upload_to_cloudflare=auto_upload_to_cloudflare
     )
