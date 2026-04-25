@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import argparse
+import json
 from typing import Any
 from mcp.server import Server
 from mcp.types import Tool, TextContent
@@ -53,6 +54,11 @@ async def main():
     setup_logging(level=config.logging.level, format_str=config.logging.format)
     logger = logging.getLogger(__name__)
     logger.info(f"Starting {config.server.name} v{config.server.version}")
+
+    # Validate API key at startup
+    if not config.openai.api_key:
+        logger.error("OpenAI API key is required. Set OPENAI__API_KEY environment variable or provide in config file.")
+        raise ValueError("OpenAI API key is required")
 
     # Create MCP server instance
     server = Server(config.server.name)
@@ -162,7 +168,10 @@ async def main():
     async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         """Handle tool calls."""
         logger.info(f"Tool called: {name}")
-        logger.debug(f"Arguments: {arguments}")
+
+        # Sanitize sensitive data before logging
+        sanitized_args = {k: v for k, v in arguments.items() if k not in ["api_key", "token", "password"]}
+        logger.debug(f"Arguments: {sanitized_args}")
 
         try:
             if name == "generate_image":
@@ -177,7 +186,7 @@ async def main():
                     base_url=config.openai.base_url,
                     save_directory=config.image.save_directory
                 )
-                return [TextContent(type="text", text=str(result))]
+                return [TextContent(type="text", text=json.dumps(result))]
 
             elif name == "edit_image":
                 result = await edit_image_tool(
@@ -192,7 +201,7 @@ async def main():
                     base_url=config.openai.base_url,
                     save_directory=config.image.save_directory
                 )
-                return [TextContent(type="text", text=str(result))]
+                return [TextContent(type="text", text=json.dumps(result))]
 
             elif name == "get_server_info":
                 result = get_server_info_tool(
@@ -202,7 +211,7 @@ async def main():
                     default_model=config.openai.default_model,
                     default_size=config.image.default_size
                 )
-                return [TextContent(type="text", text=str(result))]
+                return [TextContent(type="text", text=json.dumps(result))]
 
             else:
                 raise ValueError(f"Unknown tool: {name}")

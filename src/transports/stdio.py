@@ -15,9 +15,13 @@ async def run_stdio_server(server: Server):
         server: The MCP Server instance to run
     """
     logger.info("Starting MCP server with stdio transport")
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options()
-        )
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(
+                read_stream,
+                write_stream,
+                server.create_initialization_options()
+            )
+    except Exception as e:
+        logger.error(f"Error running stdio server: {e}", exc_info=True)
+        raise
