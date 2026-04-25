@@ -95,7 +95,7 @@ class ImageHandler:
                     )
                     logger.info(f"Successfully uploaded to Cloudflare: {url}")
                     return {"format": "url", "data": url}
-                except Exception as e:
+                except (httpx.HTTPError, ValueError) as e:
                     logger.error(f"Failed to upload to Cloudflare: {e}")
                     logger.warning("Falling back to base64 format")
                     return {"format": "base64", "data": base64_data}
