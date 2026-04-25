@@ -138,3 +138,58 @@ async def test_custom_output_path():
         assert Path(result["data"]) == Path(custom_path)
         assert Path(custom_path).exists()
 
+
+@pytest.mark.asyncio
+async def test_process_base64_image_to_url_with_cloudflare():
+    """Test processing base64 to URL with Cloudflare uploader."""
+    mock_uploader = Mock()
+    mock_uploader.upload_base64 = AsyncMock(return_value="https://cdn.test.com/image.png")
+
+    handler = ImageHandler(
+        save_directory="./test_images",
+        cloudflare_uploader=mock_uploader,
+        auto_upload_to_cloudflare=True
+    )
+
+    result = await handler.process_base64_image(
+        base64_data="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        output_format="url",
+        filename="test.png"
+    )
+
+    assert result["format"] == "url"
+    assert result["data"] == "https://cdn.test.com/image.png"
+    mock_uploader.upload_base64.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_process_base64_image_to_url_without_cloudflare():
+    """Test processing base64 to URL without Cloudflare falls back to base64."""
+    handler = ImageHandler(
+        save_directory="./test_images",
+        cloudflare_uploader=None,
+        auto_upload_to_cloudflare=True
+    )
+
+    result = await handler.process_base64_image(
+        base64_data="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        output_format="url"
+    )
+
+    assert result["format"] == "base64"
+    assert result["data"] == "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+
+@pytest.mark.asyncio
+async def test_process_base64_image_to_file():
+    """Test processing base64 to file."""
+    handler = ImageHandler(save_directory="./test_images")
+
+    result = await handler.process_base64_image(
+        base64_data="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        output_format="file"
+    )
+
+    assert result["format"] == "file"
+    assert "test_images" in result["data"]
+

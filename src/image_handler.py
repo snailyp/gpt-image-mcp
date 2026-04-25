@@ -13,16 +13,26 @@ logger = logging.getLogger(__name__)
 class ImageHandler:
     """Handles image downloading, format conversion, and saving."""
 
-    def __init__(self, save_directory: str = "./images", download_retry: int = 3):
+    def __init__(
+        self,
+        save_directory: str = "./images",
+        download_retry: int = 3,
+        cloudflare_uploader: Optional['CloudflareUploader'] = None,
+        auto_upload_to_cloudflare: bool = True
+    ):
         """
         Initialize the image handler.
 
         Args:
             save_directory: Directory to save images
             download_retry: Number of retry attempts for downloads
+            cloudflare_uploader: Optional CloudflareUploader instance
+            auto_upload_to_cloudflare: Whether to auto-upload to Cloudflare when output_format is url
         """
         self.save_directory = Path(save_directory)
         self.download_retry = download_retry
+        self.cloudflare_uploader = cloudflare_uploader
+        self.auto_upload_to_cloudflare = auto_upload_to_cloudflare
         self.save_directory.mkdir(parents=True, exist_ok=True)
 
     async def download_image(
@@ -55,6 +65,52 @@ class ImageHandler:
         elif output_format == "base64":
             encoded = base64.b64encode(image_data).decode("utf-8")
             return {"format": "base64", "data": encoded}
+
+    async def process_base64_image(
+        self,
+        base64_data: str,
+        output_format: Literal["url", "file", "base64"] = "url",
+        output_path: Optional[str] = None,
+        filename: Optional[str] = None
+    ) -> dict:
+        """
+        Process base64 image data and return in specified format.
+
+        Args:
+            base64_data: base64-encoded image data
+            output_format: Output format (url, file, or base64)
+            output_path: Optional custom path for file output
+            filename: Filename for Cloudflare upload
+
+        Returns:
+            Dictionary with format and data keys
+        """
+        if output_format == "url":
+            if self.cloudflare_uploader and self.auto_upload_to_cloudflare:
+                # Upload to Cloudflare
+                try:
+                    url = await self.cloudflare_uploader.upload_base64(
+                        base64_data,
+                        filename or f"{uuid.uuid4()}.png"
+                    )
+                    logger.info(f"Successfully uploaded to Cloudflare: {url}")
+                    return {"format": "url", "data": url}
+                except Exception as e:
+                    logger.error(f"Failed to upload to Cloudflare: {e}")
+                    logger.warning("Falling back to base64 format")
+                    return {"format": "base64", "data": base64_data}
+            else:
+                logger.warning("Cloudflare uploader not configured, returning base64")
+                return {"format": "base64", "data": base64_data}
+
+        elif output_format == "file":
+            # Decode base64 and save to file
+            image_bytes = base64.b64decode(base64_data)
+            file_path = await self._save_image(image_bytes, "image.png", output_path)
+            return {"format": "file", "data": str(file_path)}
+
+        elif output_format == "base64":
+            return {"format": "base64", "data": base64_data}
 
     async def _fetch_image(self, url: str) -> bytes:
         """
