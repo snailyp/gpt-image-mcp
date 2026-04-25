@@ -613,7 +613,7 @@ async def test_process_image_request_with_cloudflare():
     )
 
     with patch('src.tools.common.OpenAIClient') as mock_client_class, \
-         patch('src.tools.common.CloudflareUploader') as mock_uploader_class, \
+         patch('src.cloudflare_uploader.CloudflareUploader') as mock_uploader_class, \
          patch('src.tools.common.ImageHandler') as mock_handler_class:
 
         # Setup mocks

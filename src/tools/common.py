@@ -1,8 +1,11 @@
 import logging
-from typing import Optional, Literal, Dict, Any, Callable, Awaitable
+from typing import Optional, Literal, Dict, Any, Callable, Awaitable, TYPE_CHECKING
 from src.openai_client import OpenAIClient
 from src.image_handler import ImageHandler
-from src.cloudflare_uploader import CloudflareUploader
+
+if TYPE_CHECKING:
+    from src.cloudflare_uploader import CloudflareUploader
+    from src.config import CloudflareConfig
 
 
 logger = logging.getLogger(__name__)
@@ -19,7 +22,7 @@ async def process_image_request(
     quality: str,
     api_call: Callable[[OpenAIClient], Awaitable[str]],
     operation_name: str,
-    cloudflare_config: Optional[Any] = None,
+    cloudflare_config: Optional['CloudflareConfig'] = None,
     auto_upload_to_cloudflare: bool = True
 ) -> Dict[str, Any]:
     """
@@ -67,6 +70,7 @@ async def process_image_request(
         # Create CloudflareUploader if config is provided
         uploader = None
         if cloudflare_config:
+            from src.cloudflare_uploader import CloudflareUploader
             uploader = CloudflareUploader(
                 auth_code=cloudflare_config.auth_code,
                 api_url=cloudflare_config.api_url,
