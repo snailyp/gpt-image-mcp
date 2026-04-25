@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Literal, Dict, Any, Callable, Awaitable
 from src.openai_client import OpenAIClient
 from src.image_handler import ImageHandler
+from src.cloudflare_uploader import CloudflareUploader
 
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,9 @@ async def process_image_request(
     size: str,
     quality: str,
     api_call: Callable[[OpenAIClient], Awaitable[str]],
-    operation_name: str
+    operation_name: str,
+    cloudflare_config: Optional[Any] = None,
+    auto_upload_to_cloudflare: bool = True
 ) -> Dict[str, Any]:
     """
     Common helper function for processing image generation and editing requests.
@@ -31,8 +34,10 @@ async def process_image_request(
         model: Model to use
         size: Image size
         quality: Image quality
-        api_call: Async callback function that takes OpenAIClient and returns image URL
+        api_call: Async callback function that takes OpenAIClient and returns base64 or URL
         operation_name: Name of the operation for logging (e.g., "Generating", "Editing")
+        cloudflare_config: Optional CloudflareConfig for uploading images
+        auto_upload_to_cloudflare: Whether to auto-upload to Cloudflare when output_format is url
 
     Returns:
         Dictionary with:
@@ -54,20 +59,43 @@ async def process_image_request(
         # Create OpenAI client
         client = OpenAIClient(api_key=api_key, base_url=base_url)
 
-        # Call the API (generate or edit)
-        image_url = await api_call(client)
+        # Call the API (generate or edit) - returns base64 data or URL
+        image_data = await api_call(client)
 
-        logger.info(f"Image {operation_name.lower()} successfully: {image_url}")
+        logger.info(f"Image {operation_name.lower()} successfully")
 
-        # Create ImageHandler to process output format
-        handler = ImageHandler(save_directory=save_directory)
+        # Create CloudflareUploader if config is provided
+        uploader = None
+        if cloudflare_config:
+            uploader = CloudflareUploader(
+                auth_code=cloudflare_config.auth_code,
+                api_url=cloudflare_config.api_url,
+                upload_folder=cloudflare_config.upload_folder
+            )
+            logger.debug("CloudflareUploader initialized")
 
-        # Download/convert image to requested format
-        result = await handler.download_image(
-            url=image_url,
-            output_format=output_format,
-            output_path=output_path
+        # Create ImageHandler with optional Cloudflare uploader
+        handler = ImageHandler(
+            save_directory=save_directory,
+            cloudflare_uploader=uploader,
+            auto_upload_to_cloudflare=auto_upload_to_cloudflare
         )
+
+        # Check if image_data is a URL or base64
+        if image_data.startswith("http://") or image_data.startswith("https://"):
+            # It's a URL, use download_image
+            result = await handler.download_image(
+                url=image_data,
+                output_format=output_format,
+                output_path=output_path
+            )
+        else:
+            # It's base64 data, use process_base64_image
+            result = await handler.process_base64_image(
+                base64_data=image_data,
+                output_format=output_format,
+                output_path=output_path
+            )
 
         logger.info(f"Image processed to {output_format} format successfully")
 

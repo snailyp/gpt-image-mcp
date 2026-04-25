@@ -50,7 +50,11 @@ async def test_generate_image_tool_url_format():
         )
 
         # Verify handler was called correctly
-        mock_handler_class.assert_called_once_with(save_directory="./images")
+        mock_handler_class.assert_called_once_with(
+            save_directory="./images",
+            cloudflare_uploader=None,
+            auto_upload_to_cloudflare=True
+        )
         mock_handler.download_image.assert_called_once_with(
             url="https://example.com/generated.png",
             output_format="url",
@@ -108,7 +112,11 @@ async def test_generate_image_tool_file_format():
         )
 
         # Verify handler was called correctly
-        mock_handler_class.assert_called_once_with(save_directory="./custom_images")
+        mock_handler_class.assert_called_once_with(
+            save_directory="./custom_images",
+            cloudflare_uploader=None,
+            auto_upload_to_cloudflare=True
+        )
         mock_handler.download_image.assert_called_once_with(
             url="https://example.com/generated.png",
             output_format="file",
@@ -309,7 +317,11 @@ async def test_edit_image_tool():
         )
 
         # Verify handler was called correctly
-        mock_handler_class.assert_called_once_with(save_directory="./images")
+        mock_handler_class.assert_called_once_with(
+            save_directory="./images",
+            cloudflare_uploader=None,
+            auto_upload_to_cloudflare=True
+        )
         mock_handler.download_image.assert_called_once_with(
             url="https://example.com/edited.png",
             output_format="url",
@@ -371,7 +383,11 @@ async def test_edit_image_tool_file_format():
         )
 
         # Verify handler was called correctly
-        mock_handler_class.assert_called_once_with(save_directory="./custom_images")
+        mock_handler_class.assert_called_once_with(
+            save_directory="./custom_images",
+            cloudflare_uploader=None,
+            auto_upload_to_cloudflare=True
+        )
         mock_handler.download_image.assert_called_once_with(
             url="https://example.com/edited.png",
             output_format="file",
@@ -582,3 +598,63 @@ def test_get_server_info_tool():
     # Assert config contains default values
     assert result["config"]["default_model"] == "gpt-4-turbo"
     assert result["config"]["default_size"] == "512x512"
+
+
+@pytest.mark.asyncio
+async def test_process_image_request_with_cloudflare():
+    """Test process_image_request with Cloudflare configuration."""
+    from src.tools.common import process_image_request
+    from src.config import CloudflareConfig
+
+    cloudflare_config = CloudflareConfig(
+        auth_code="test_auth",
+        api_url="https://api.test.com/upload",
+        upload_folder="test_folder"
+    )
+
+    with patch('src.tools.common.OpenAIClient') as mock_client_class, \
+         patch('src.tools.common.CloudflareUploader') as mock_uploader_class, \
+         patch('src.tools.common.ImageHandler') as mock_handler_class:
+
+        # Setup mocks
+        mock_client = Mock()
+        mock_client.generate_image = AsyncMock(return_value="base64_image_data")
+        mock_client_class.return_value = mock_client
+
+        mock_uploader = Mock()
+        mock_uploader_class.return_value = mock_uploader
+
+        mock_handler = Mock()
+        mock_handler.process_base64_image = AsyncMock(return_value={
+            "format": "url",
+            "data": "https://cdn.test.com/image.png"
+        })
+        mock_handler_class.return_value = mock_handler
+
+        # Call function
+        async def api_call(client):
+            return await client.generate_image(prompt="test")
+
+        result = await process_image_request(
+            api_key="test_key",
+            base_url="https://api.openai.com/v1",
+            save_directory="./images",
+            output_format="url",
+            output_path=None,
+            model="gpt-4o",
+            size="1024x1024",
+            quality="standard",
+            api_call=api_call,
+            operation_name="Generating",
+            cloudflare_config=cloudflare_config,
+            auto_upload_to_cloudflare=True
+        )
+
+        # Assertions
+        assert result["success"] is True
+        assert result["data"] == "https://cdn.test.com/image.png"
+        mock_uploader_class.assert_called_once_with(
+            auth_code="test_auth",
+            api_url="https://api.test.com/upload",
+            upload_folder="test_folder"
+        )
