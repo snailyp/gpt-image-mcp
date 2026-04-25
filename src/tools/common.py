@@ -69,7 +69,7 @@ async def process_image_request(
 
         # Create CloudflareUploader if config is provided
         uploader = None
-        if cloudflare_config:
+        if cloudflare_config and cloudflare_config.auth_code and cloudflare_config.api_url:
             from src.cloudflare_uploader import CloudflareUploader
             uploader = CloudflareUploader(
                 auth_code=cloudflare_config.auth_code,
