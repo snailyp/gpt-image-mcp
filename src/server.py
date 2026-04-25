@@ -223,6 +223,13 @@ async def main():
     # Run server with configured transport
     if config.server.transport == "stdio":
         await run_stdio_server(server)
+    elif config.server.transport == "http":
+        from src.transports.http import run_http_server
+        await run_http_server(
+            server,
+            host=config.http.host,
+            port=config.http.port
+        )
     else:
         logger.error(f"Unsupported transport: {config.server.transport}")
         raise ValueError(f"Unsupported transport: {config.server.transport}")
