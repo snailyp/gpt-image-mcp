@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Optional, Literal, Dict, Any, Callable, Awaitable, TYPE_CHECKING
 from src.openai_client import OpenAIClient
 from src.image_handler import ImageHandler
@@ -98,7 +99,8 @@ async def process_image_request(
             result = await handler.process_base64_image(
                 base64_data=image_data,
                 output_format=output_format,
-                output_path=output_path
+                output_path=output_path,
+                filename=f"{operation_name.lower()}_{uuid.uuid4()}.png"
             )
 
         logger.info(f"Image processed to {output_format} format successfully")
