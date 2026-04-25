@@ -21,6 +21,14 @@ class ImageConfig(BaseModel):
     default_output_format: str = Field(default="url")
     save_directory: str = Field(default="./images")
     download_retry: int = Field(default=3)
+    auto_upload_to_cloudflare: bool = Field(default=True)
+
+
+class CloudflareConfig(BaseModel):
+    """Cloudflare Images configuration."""
+    auth_code: str = Field(default="")
+    api_url: str = Field(default="")
+    upload_folder: str = Field(default="")
 
 
 class ServerConfig(BaseModel):
@@ -69,6 +77,8 @@ class JsonConfigSource(PydanticBaseSettingsSource):
 class Config(BaseSettings):
     """Main configuration class with multi-layer loading support."""
     model_config = SettingsConfigDict(
+        env_file='.env',
+        env_file_encoding='utf-8',
         env_nested_delimiter='__',
         case_sensitive=False,
         extra='ignore'
@@ -76,6 +86,7 @@ class Config(BaseSettings):
 
     openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
     image: ImageConfig = Field(default_factory=ImageConfig)
+    cloudflare: CloudflareConfig = Field(default_factory=CloudflareConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
     http: HTTPConfig = Field(default_factory=HTTPConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -91,14 +102,13 @@ class Config(BaseSettings):
     ) -> Tuple[PydanticBaseSettingsSource, ...]:
         """
         Customize settings sources priority.
-        Priority order: init_settings (CLI args) > env_settings > json_file > defaults
+        Priority order: init_settings (CLI args) > env_settings > dotenv_settings (.env) > json_file > defaults
         """
-        _ = dotenv_settings  # Unused but required by interface
         json_file = getattr(settings_cls, '_json_config_file', None)
         json_source = JsonConfigSource(settings_cls, json_file)
 
         # Return sources in priority order (first = highest priority)
-        return (init_settings, env_settings, json_source, file_secret_settings)
+        return (init_settings, env_settings, dotenv_settings, json_source, file_secret_settings)
 
 
 def load_config(

@@ -131,3 +131,25 @@ def test_env_var_type_conversion_error():
             load_config()
     finally:
         del os.environ["HTTP__PORT"]
+
+
+def test_cloudflare_config_from_env(monkeypatch):
+    """Test CloudflareConfig loads from environment variables."""
+    monkeypatch.setenv("CLOUDFLARE__AUTH_CODE", "test_auth_code")
+    monkeypatch.setenv("CLOUDFLARE__API_URL", "https://test.api.com")
+    monkeypatch.setenv("CLOUDFLARE__UPLOAD_FOLDER", "test_folder")
+
+    config = load_config()
+
+    assert config.cloudflare.auth_code == "test_auth_code"
+    assert config.cloudflare.api_url == "https://test.api.com"
+    assert config.cloudflare.upload_folder == "test_folder"
+
+
+def test_image_config_auto_upload_flag(monkeypatch):
+    """Test ImageConfig auto_upload_to_cloudflare flag."""
+    monkeypatch.setenv("IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE", "false")
+
+    config = load_config()
+
+    assert config.image.auto_upload_to_cloudflare is False
