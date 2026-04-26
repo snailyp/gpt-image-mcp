@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server that provides image generation and editing
 
 ## Features
 
-- **Text-to-Image Generation**: Create images from text prompts using GPT-4o or GPT-4-turbo
+- **Text-to-Image Generation**: Create images from text prompts using gpt-image-2 or gpt-image-1.5
 - **Image Editing**: Modify existing images with natural language instructions
 - **Multiple Output Formats**: Return images as URLs, save to files, or encode as base64
 - **Dual Transport Modes**: Run locally via stdio or remotely via SSE
@@ -16,7 +16,7 @@ A Model Context Protocol (MCP) server that provides image generation and editing
 ### Prerequisites
 
 - Python 3.11 or higher
-- OpenAI API key with access to GPT-4o or GPT-4-turbo
+- OpenAI API key with access to gpt-image-2 or gpt-image-1.5
 
 ### Install Dependencies
 
@@ -157,7 +157,7 @@ Generate an image from a text prompt using OpenAI's Responses API.
 ```json
 {
   "prompt": "a serene mountain landscape at sunset",
-  "model": "gpt-4o",
+  "model": "gpt-image-2",
   "quality": "high",
   "output_format": "file"
 }
@@ -171,7 +171,7 @@ Edit an existing image using a text prompt.
 
 - `image_input` (string, required): URL or file path of the image to edit
 - `prompt` (string, required): Text description of the desired changes
-- `model` (string, optional): Model to use (default: `gpt-4o`)
+- `model` (string, optional): Model to use (default: `gpt-image-2`)
 - `quality` (string, optional): Image quality (default: `standard`)
 - `output_format` (string, optional): Output format (default: `url`)
 - `output_path` (string, optional): Custom file path when using `file` format
@@ -184,7 +184,7 @@ Edit an existing image using a text prompt.
   "format": "url",
   "data": "https://...",
   "metadata": {
-    "model": "gpt-4o",
+    "model": "gpt-image-2",
     "quality": "auto"
   }
 }
@@ -214,7 +214,7 @@ Get server information, configuration, and capabilities.
   "name": "gpt-image-mcp",
   "version": "1.0.0",
   "transport": "stdio",
-  "supported_models": ["gpt-4o", "gpt-4-turbo"],
+  "supported_models": ["gpt-image-2", "gpt-image-1.5"],
   "supported_formats": ["url", "file", "base64"],
   "config": {
     "default_model": "gpt-image-2"
@@ -382,7 +382,7 @@ Common errors:
 
 ### Image generation fails
 
-1. Confirm API key has access to GPT-4o or GPT-4-turbo
+1. Confirm API key has access to gpt-image-2 or gpt-image-1.5
 2. Check OpenAI API status
 3. Review logs for detailed error messages
 
