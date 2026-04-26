@@ -7,7 +7,7 @@ A Model Context Protocol (MCP) server that provides image generation and editing
 - **Text-to-Image Generation**: Create images from text prompts using GPT-4o or GPT-4-turbo
 - **Image Editing**: Modify existing images with natural language instructions
 - **Multiple Output Formats**: Return images as URLs, save to files, or encode as base64
-- **Dual Transport Modes**: Run locally via stdio or remotely via HTTP
+- **Dual Transport Modes**: Run locally via stdio or remotely via SSE
 - **Flexible Configuration**: Environment variables, JSON config files, and CLI arguments
 - **Retry Mechanism**: Automatic retry for image downloads with configurable attempts
 
@@ -23,6 +23,8 @@ A Model Context Protocol (MCP) server that provides image generation and editing
 ```bash
 pip install -r requirements.txt
 ```
+
+This project uses [fastmcp](https://github.com/jlowin/fastmcp) for the MCP server implementation.
 
 ## Configuration
 
@@ -59,9 +61,9 @@ IMAGE__DOWNLOAD_RETRY=3
 # Server Configuration
 SERVER__NAME=gpt-image-mcp
 SERVER__VERSION=1.0.0
-SERVER__TRANSPORT=stdio
+SERVER__TRANSPORT=stdio  # Options: stdio (local/MCP clients), sse (remote access), http (alias for sse)
 
-# HTTP Configuration (for HTTP transport)
+# SSE Configuration (for SSE transport)
 HTTP__HOST=0.0.0.0
 HTTP__PORT=8000
 HTTP__ENDPOINT=/mcp
@@ -96,15 +98,15 @@ Or with a custom config file:
 python -m src.server --config config.json --transport stdio
 ```
 
-### HTTP Mode (Remote Access)
+### SSE Mode (Remote Access)
 
-For remote access via HTTP:
+For remote access via Server-Sent Events:
 
 ```bash
-python -m src.server --transport http --port 8000
+python -m src.server --transport sse --port 8000
 ```
 
-The server will be available at `http://0.0.0.0:8000/mcp`
+The server will be available at `http://0.0.0.0:8000`
 
 ### Command-Line Options
 
@@ -113,9 +115,9 @@ python -m src.server [OPTIONS]
 
 Options:
   --config PATH       Path to JSON configuration file
-  --transport TYPE    Transport mode: stdio or http (default: stdio)
-  --port PORT         HTTP server port (default: 8000)
-  --host HOST         HTTP server host (default: 0.0.0.0)
+  --transport TYPE    Transport mode: stdio, sse, or http (default: stdio)
+  --port PORT         SSE server port (default: 8000)
+  --host HOST         SSE server host (default: 0.0.0.0)
 ```
 
 ## MCP Tools
@@ -346,8 +348,7 @@ gpt-image-mcp/
 │   │   └── info.py            # get_server_info tool
 │   └── transports/
 │       ├── __init__.py
-│       ├── stdio.py           # stdio transport
-│       └── http.py            # HTTP transport
+│       └── stdio.py           # stdio transport (SSE via fastmcp)
 ├── tests/
 │   ├── __init__.py
 │   ├── test_config.py
@@ -394,11 +395,22 @@ Common errors:
 2. Check OpenAI API status
 3. Review logs for detailed error messages
 
-### HTTP mode not accessible
+### SSE mode not accessible
 
 1. Check firewall settings
 2. Verify port is not in use: `netstat -an | grep 8000`
 3. Try binding to localhost: `--host 127.0.0.1`
+
+## Migration to fastmcp
+
+This project has been migrated from the standard `mcp` library to `fastmcp` for improved developer experience and reduced boilerplate. The migration:
+
+- Simplified tool definitions using decorators
+- Reduced server code by ~150 lines
+- Replaced HTTP transport with SSE (Server-Sent Events)
+- Maintained all existing functionality and APIs
+
+For the migration design and implementation details, see `docs/superpowers/specs/2026-04-26-fastmcp-migration-design.md`.
 
 ## License
 
