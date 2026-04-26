@@ -1,34 +1,41 @@
 """Server information tool for MCP."""
 
+from typing import Any, Dict
 
-def get_server_info_tool(
-    server_name: str = "gpt-image-mcp",
-    server_version: str = "1.0.0",
-    transport: str = "stdio",
-    default_model: str = "gpt-4o",
-    default_size: str = "1024x1024"
-) -> dict:
-    """
-    Get server metadata and configuration information.
+from fastmcp import Context
+
+from src.tools.generate import mcp
+
+
+@mcp.tool()
+def get_server_info(ctx: Context) -> Dict[str, Any]:
+    """Get server metadata and configuration information.
+
+    Returns server name, version, transport mode, supported models and formats,
+    and current configuration defaults.
 
     Args:
-        server_name: Name of the MCP server
-        server_version: Version of the server
-        transport: Transport protocol (stdio, http, etc.)
-        default_model: Default model to use for image generation
-        default_size: Default image size
+        ctx: FastMCP context containing configuration
 
     Returns:
-        Dictionary containing server metadata, supported models, formats, and config
+        Dictionary with:
+            - name: Server name
+            - version: Server version
+            - transport: Transport mode (stdio or sse)
+            - supported_models: List of supported OpenAI models
+            - supported_formats: List of supported output formats
+            - config: Current configuration defaults
     """
+    config = ctx["config"]
+
     return {
-        "name": server_name,
-        "version": server_version,
-        "transport": transport,
+        "name": config.server.name,
+        "version": config.server.version,
+        "transport": config.server.transport,
         "supported_models": ["gpt-4o", "gpt-4-turbo"],
         "supported_formats": ["url", "file", "base64"],
         "config": {
-            "default_model": default_model,
-            "default_size": default_size
+            "default_model": config.openai.default_model,
+            "default_size": config.image.default_size
         }
     }

@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "MCP server for OpenAI image generation via Responses API"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.0.0",
+    "fastmcp>=3.2.0,<4.0.0",
     "openai>=1.0.0",
     "httpx>=0.27.0",
     "python-dotenv>=1.0.0",
