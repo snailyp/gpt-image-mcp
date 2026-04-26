@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, Literal
 
 from fastmcp import Context
+from fastmcp.server.dependencies import get_http_request
 
 from src.tools.common import process_image_request
 from src.tools.generate import mcp
@@ -39,6 +40,18 @@ async def edit_image(
             - error: error message if success is False
     """
     config = ctx.fastmcp.context["config"]
+
+    # Validate authorization if configured
+    if config.openai.authorization:
+        try:
+            request = get_http_request()
+            auth_header = request.headers.get("authorization", "")
+        except Exception:
+            auth_header = ""
+
+        if not auth_header or auth_header != config.openai.authorization:
+            logger.error("Unauthorized access attempt")
+            return {"success": False, "error": "Unauthorized: Invalid or missing authorization header"}
 
     # Validate image_input
     if not image_input:

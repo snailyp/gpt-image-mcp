@@ -2,7 +2,7 @@
 name = "gpt-image-mcp"
 version = "1.0.0"
 description = "MCP server for OpenAI image generation via Responses API"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=3.2.0,<4.0.0",
     "openai>=1.0.0",

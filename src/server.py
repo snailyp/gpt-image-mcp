@@ -1,16 +1,21 @@
 """Main MCP server entry point."""
+
+import argparse
 import asyncio
 import logging
-import argparse
 
 from src.config import load_config
-from src.tools.generate import mcp, generate_image
-from src.tools.edit import edit_image
-from src.tools.info import get_server_info
-# Note: Tool functions are imported for their side effect of registering with mcp instance
+from src.tools.generate import mcp
+
+# Import tool modules to register them with mcp instance
+import src.tools.edit  # noqa: F401
+import src.tools.info  # noqa: F401
 
 
-def setup_logging(level: str = "INFO", format_str: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"):
+def setup_logging(
+    level: str = "INFO",
+    format_str: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+):
     """
     Configure logging for the server.
 
@@ -18,10 +23,7 @@ def setup_logging(level: str = "INFO", format_str: str = "%(asctime)s - %(name)s
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         format_str: Log message format string
     """
-    logging.basicConfig(
-        level=getattr(logging, level.upper()),
-        format=format_str
-    )
+    logging.basicConfig(level=getattr(logging, level.upper()), format=format_str)
 
 
 async def main():
@@ -29,7 +31,12 @@ async def main():
     # Parse CLI arguments
     parser = argparse.ArgumentParser(description="GPT Image MCP Server")
     parser.add_argument("--config", type=str, help="Path to configuration file")
-    parser.add_argument("--transport", type=str, default="stdio", help="Transport protocol (default: stdio)")
+    parser.add_argument(
+        "--transport",
+        type=str,
+        default="stdio",
+        help="Transport protocol (default: stdio)",
+    )
     parser.add_argument("--port", type=int, help="Port for HTTP transport")
     parser.add_argument("--host", type=str, help="Host for HTTP transport")
     args = parser.parse_args()
@@ -44,7 +51,9 @@ async def main():
         cli_args["http.host"] = args.host
 
     # Load configuration
-    config = load_config(config_file=args.config, cli_args=cli_args if cli_args else None)
+    config = load_config(
+        config_file=args.config, cli_args=cli_args if cli_args else None
+    )
 
     # Setup logging
     setup_logging(level=config.logging.level, format_str=config.logging.format)
@@ -53,7 +62,9 @@ async def main():
 
     # Validate API key at startup
     if not config.openai.api_key:
-        logger.error("OpenAI API key is required. Set OPENAI__API_KEY environment variable or provide in config file.")
+        logger.error(
+            "OpenAI API key is required. Set OPENAI__API_KEY environment variable or provide in config file."
+        )
         raise ValueError("OpenAI API key is required")
 
     # Inject config into context
@@ -65,9 +76,7 @@ async def main():
     elif config.server.transport in ("sse", "http"):
         # Map "http" to "sse" for backward compatibility
         await mcp.run_async(
-            transport="sse",
-            host=config.http.host,
-            port=config.http.port
+            transport="sse", host=config.http.host, port=config.http.port
         )
     else:
         logger.error(f"Unsupported transport: {config.server.transport}")

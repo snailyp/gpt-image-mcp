@@ -12,6 +12,7 @@ class OpenAIConfig(BaseModel):
     base_url: str = Field(default="https://api.openai.com/v1")
     default_model: str = Field(default="gpt-image-2")
     timeout: int = Field(default=60)
+    authorization: str = Field(default="")
 
 
 class ImageConfig(BaseModel):
