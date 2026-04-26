@@ -83,35 +83,71 @@ class OpenAIClient:
 
     async def edit_image(
         self,
-        image_data: str,
+        image_url: str,
         prompt: str,
-        model: str = "gpt-4o",
+        model: str = "dall-e-2",
         size: str = "1024x1024",
         quality: str = "standard",
         previous_response_id: Optional[str] = None
     ) -> str:
-        """Edit an image using OpenAI Responses API.
-
-        NOTE: This method is temporarily disabled pending Task 5 migration to Images API.
+        """Edit an image using OpenAI Images API.
 
         Args:
-            image_data: Base64-encoded image data or image URL
+            image_url: Image URL or local file path
             prompt: Text description of the edits to make
-            model: Model to use for editing
-            size: Image size (e.g., "1024x1024", "1792x1024", "1024x1792")
+            model: Model to use for editing (dall-e-2)
+            size: Image size (e.g., "1024x1024")
             quality: Image quality ("standard" or "hd")
-            previous_response_id: Optional ID of previous response for multi-turn editing
+            previous_response_id: Ignored (kept for compatibility)
 
         Returns:
             Base64-encoded edited image data
 
         Raises:
-            NotImplementedError: Method temporarily disabled pending Task 5 implementation
+            ValueError: If image cannot be loaded or processed
+            openai.APIError: If API call fails
         """
-        raise NotImplementedError(
-            "edit_image() is temporarily disabled. "
-            "This method will be reimplemented using Images API in Task 5."
+        from io import BytesIO
+        import os
+
+        logger.info(f"Editing image with prompt: {prompt}")
+
+        # Determine if input is URL or file path
+        if image_url.startswith(('http://', 'https://')):
+            # Download from URL
+            image_bytes = await self._download_image(image_url)
+        else:
+            # Read from local file
+            if not os.path.exists(image_url):
+                raise ValueError(f"Image file not found: {image_url}")
+
+            logger.info(f"Reading image from file: {image_url}")
+            with open(image_url, 'rb') as f:
+                image_bytes = f.read()
+
+        # Ensure PNG format (Images API requirement)
+        png_bytes = self._ensure_png_format(image_bytes)
+
+        # Create file-like object for upload
+        image_file = BytesIO(png_bytes)
+        image_file.name = "image.png"
+
+        # Call Images API
+        logger.info(f"Calling Images API edit with model={model}, size={size}")
+        response = await self.client.images.edit(
+            image=image_file,
+            prompt=prompt,
+            model=model,
+            size=size,
+            n=1,
+            response_format="b64_json"
         )
+
+        # Extract base64 image data
+        edited_image = response.data[0].b64_json
+        logger.info("Successfully edited image")
+
+        return edited_image
 
     def _get_image_generation_tool(self):
         """Temporary stub - will be removed in Task 5.

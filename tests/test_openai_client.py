@@ -109,3 +109,80 @@ async def test_generate_image_api_error():
 
     with pytest.raises(openai.APIError):
         await client.generate_image(prompt="test")
+
+
+@pytest.mark.asyncio
+async def test_edit_image_with_url():
+    """Test image editing with URL input using Images API."""
+    client = OpenAIClient(api_key="test-key")
+
+    # Mock download
+    client._download_image = AsyncMock(return_value=b"fake_image_bytes")
+
+    # Mock PNG conversion
+    client._ensure_png_format = MagicMock(return_value=b"fake_png_bytes")
+
+    # Mock Images API response
+    mock_response = MagicMock()
+    mock_data = MagicMock()
+    mock_data.b64_json = "edited_base64_data"
+    mock_response.data = [mock_data]
+
+    client.client.images.edit = AsyncMock(return_value=mock_response)
+
+    result = await client.edit_image(
+        image_url="https://example.com/image.jpg",
+        prompt="add a rainbow",
+        model="dall-e-2",
+        size="1024x1024",
+        quality="standard"
+    )
+
+    assert result == "edited_base64_data"
+    client._download_image.assert_called_once_with("https://example.com/image.jpg")
+    client._ensure_png_format.assert_called_once_with(b"fake_image_bytes")
+
+
+@pytest.mark.asyncio
+async def test_edit_image_with_file_path():
+    """Test image editing with local file path."""
+    client = OpenAIClient(api_key="test-key")
+
+    # Mock file read
+    mock_file_data = b"fake_file_bytes"
+
+    # Mock PNG conversion
+    client._ensure_png_format = MagicMock(return_value=b"fake_png_bytes")
+
+    # Mock Images API response
+    mock_response = MagicMock()
+    mock_data = MagicMock()
+    mock_data.b64_json = "edited_base64_data"
+    mock_response.data = [mock_data]
+
+    client.client.images.edit = AsyncMock(return_value=mock_response)
+
+    with patch("os.path.exists", return_value=True):
+        with patch("builtins.open", create=True) as mock_open:
+            mock_open.return_value.__enter__.return_value.read.return_value = mock_file_data
+
+            result = await client.edit_image(
+                image_url="/path/to/image.png",
+                prompt="change colors",
+                model="dall-e-2"
+            )
+
+    assert result == "edited_base64_data"
+    client._ensure_png_format.assert_called_once_with(mock_file_data)
+
+
+@pytest.mark.asyncio
+async def test_edit_image_file_not_found():
+    """Test error handling when file doesn't exist."""
+    client = OpenAIClient(api_key="test-key")
+
+    with pytest.raises(ValueError, match="Image file not found"):
+        await client.edit_image(
+            image_url="/nonexistent/file.png",
+            prompt="test"
+        )
