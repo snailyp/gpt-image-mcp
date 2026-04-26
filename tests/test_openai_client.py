@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from src.openai_client import OpenAIClient
 from io import BytesIO
 from PIL import Image
+import openai
 
 
 @pytest.mark.asyncio
@@ -61,3 +62,50 @@ def test_ensure_png_format_convert_jpeg():
     result_img = Image.open(BytesIO(result))
     assert result_img.format == 'PNG'
     assert result_img.size == (100, 100)
+
+
+@pytest.mark.asyncio
+async def test_generate_image_with_images_api():
+    """Test image generation using Images API."""
+    client = OpenAIClient(api_key="test-key")
+
+    # Mock the Images API response
+    mock_response = MagicMock()
+    mock_data = MagicMock()
+    mock_data.b64_json = "fake_base64_image_data"
+    mock_response.data = [mock_data]
+
+    client.client.images.generate = AsyncMock(return_value=mock_response)
+
+    result = await client.generate_image(
+        prompt="a sunset",
+        model="dall-e-3",
+        size="1024x1024",
+        quality="standard"
+    )
+
+    assert result == "fake_base64_image_data"
+    client.client.images.generate.assert_called_once_with(
+        prompt="a sunset",
+        model="dall-e-3",
+        size="1024x1024",
+        quality="standard",
+        response_format="b64_json"
+    )
+
+
+@pytest.mark.asyncio
+async def test_generate_image_api_error():
+    """Test error handling when API fails."""
+    client = OpenAIClient(api_key="test-key")
+
+    # Create a proper APIError with required request parameter
+    mock_request = MagicMock()
+    api_error = openai.APIError("API error", request=mock_request, body=None)
+
+    client.client.images.generate = AsyncMock(
+        side_effect=api_error
+    )
+
+    with pytest.raises(openai.APIError):
+        await client.generate_image(prompt="test")

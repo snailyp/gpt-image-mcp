@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional
 import openai
 import httpx
 
@@ -25,60 +25,18 @@ class OpenAIClient:
         )
         logger.info(f"Initialized OpenAI client with base_url={base_url}, timeout={timeout}s")
 
-    def _get_image_generation_tool(self) -> List[Dict[str, Any]]:
-        """Get the image generation tool definition.
-
-        Returns:
-            List containing the tool definition
-        """
-        return [{"type": "image_generation"}]
-
-    def _extract_image_data_from_response(self, response: Any) -> str:
-        """Extract base64 image data from OpenAI Responses API response.
-
-        Args:
-            response: OpenAI Responses API response object
-
-        Returns:
-            Base64-encoded image data
-
-        Raises:
-            ValueError: If no image data is found in the response
-        """
-        if not hasattr(response, 'output') or not response.output:
-            logger.error("No output in response")
-            raise ValueError("No image generated")
-
-        # Filter for image_generation_call outputs
-        image_outputs = [
-            output for output in response.output
-            if hasattr(output, 'type') and output.type == "image_generation_call"
-        ]
-
-        if not image_outputs:
-            logger.error("No image_generation_call in response output")
-            raise ValueError("No image generated")
-
-        # Get the result from the first image output
-        image_output = image_outputs[0]
-        if not hasattr(image_output, 'result') or not image_output.result:
-            logger.error("No result in image_generation_call output")
-            raise ValueError("No image generated")
-
-        return image_output.result
-
     async def generate_image(
         self,
         prompt: str,
-        model: str = "gpt-4o",
+        model: str = "dall-e-3",
         size: str = "1024x1024",
         quality: str = "standard"
     ) -> str:
-        """Generate an image using OpenAI Responses API.
+        """Generate an image using OpenAI Images API.
 
         Args:
             prompt: Text description of the image to generate
-            model: Model to use for generation
+            model: Model to use for generation (e.g., "dall-e-3", "dall-e-2")
             size: Image size (e.g., "1024x1024", "1792x1024", "1024x1792")
             quality: Image quality ("standard" or "hd")
 
@@ -96,15 +54,14 @@ class OpenAIClient:
         logger.info(f"Generating image with prompt: {prompt[:50]}...")
         logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
 
-        # Get tool definition
-        tools = self._get_image_generation_tool()
-
-        # Call Responses API with error handling
+        # Call Images API with error handling
         try:
-            response = await self.client.responses.create(
+            response = await self.client.images.generate(
+                prompt=prompt,
                 model=model,
-                input=prompt,
-                tools=tools
+                size=size,
+                quality=quality,
+                response_format="b64_json"
             )
         except openai.APIConnectionError as e:
             logger.error(f"Failed to connect to OpenAI API: {e}")
@@ -114,7 +71,11 @@ class OpenAIClient:
             raise
 
         # Extract base64 image data from response
-        image_data = self._extract_image_data_from_response(response)
+        if not response.data or len(response.data) == 0:
+            logger.error("No image data in response")
+            raise ValueError("No image generated")
+
+        image_data = response.data[0].b64_json
 
         elapsed = time.time() - start_time
         logger.info(f"Successfully generated image (base64 data length: {len(image_data)}) in {elapsed:.2f}s")
