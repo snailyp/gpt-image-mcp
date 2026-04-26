@@ -83,15 +83,25 @@ class OpenAIClient:
             logger.error("No image data in response")
             raise ValueError("No image generated")
 
-        # Images API returns URL by default, download and convert to base64
-        image_url = response.data[0].url
-        logger.info(f"Downloading generated image from: {image_url}")
+        # Check if response has b64_json or url
+        image_obj = response.data[0]
 
-        image_bytes = await self._download_image(image_url)
+        if hasattr(image_obj, 'b64_json') and image_obj.b64_json:
+            # Response already contains base64 data
+            logger.info("Received base64 image data directly from API")
+            image_data = image_obj.b64_json
+        elif hasattr(image_obj, 'url') and image_obj.url:
+            # Response contains URL, download and convert to base64
+            image_url = image_obj.url
+            logger.info(f"Downloading generated image from: {image_url}")
+            image_bytes = await self._download_image(image_url)
 
-        # Convert to base64
-        import base64
-        image_data = base64.b64encode(image_bytes).decode('utf-8')
+            # Convert to base64
+            import base64
+            image_data = base64.b64encode(image_bytes).decode('utf-8')
+        else:
+            logger.error("Response contains neither b64_json nor url")
+            raise ValueError("Invalid response format from API")
 
         elapsed = time.time() - start_time
         logger.info(f"Successfully generated image (base64 data length: {len(image_data)}) in {elapsed:.2f}s")
@@ -166,21 +176,32 @@ class OpenAIClient:
             n=1
         )
 
-        # Extract image URL and download
+        # Extract image data from response
         if not response.data or len(response.data) == 0:
             logger.error("No image data in response")
             raise ValueError("No image generated")
 
-        edited_image_url = response.data[0].url
-        logger.info(f"Downloading edited image from: {edited_image_url}")
+        # Check if response has b64_json or url
+        image_obj = response.data[0]
 
-        edited_image_bytes = await self._download_image(edited_image_url)
+        if hasattr(image_obj, 'b64_json') and image_obj.b64_json:
+            # Response already contains base64 data
+            logger.info("Received base64 image data directly from API")
+            edited_image = image_obj.b64_json
+        elif hasattr(image_obj, 'url') and image_obj.url:
+            # Response contains URL, download and convert to base64
+            edited_image_url = image_obj.url
+            logger.info(f"Downloading edited image from: {edited_image_url}")
+            edited_image_bytes = await self._download_image(edited_image_url)
 
-        # Convert to base64
-        import base64
-        edited_image = base64.b64encode(edited_image_bytes).decode('utf-8')
+            # Convert to base64
+            import base64
+            edited_image = base64.b64encode(edited_image_bytes).decode('utf-8')
+        else:
+            logger.error("Response contains neither b64_json nor url")
+            raise ValueError("Invalid response format from API")
+
         logger.info("Successfully edited image")
-
         return edited_image
 
     def _get_image_generation_tool(self):
