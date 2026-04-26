@@ -60,8 +60,7 @@ class OpenAIClient:
                 prompt=prompt,
                 model=model,
                 size=size,
-                quality=quality,
-                response_format="b64_json"
+                quality=quality
             )
         except openai.APIConnectionError as e:
             logger.error(f"Failed to connect to OpenAI API: {e}")
@@ -70,12 +69,20 @@ class OpenAIClient:
             logger.error(f"OpenAI API error: {e}")
             raise
 
-        # Extract base64 image data from response
+        # Extract image data from response
         if not response.data or len(response.data) == 0:
             logger.error("No image data in response")
             raise ValueError("No image generated")
 
-        image_data = response.data[0].b64_json
+        # Images API returns URL by default, download and convert to base64
+        image_url = response.data[0].url
+        logger.info(f"Downloading generated image from: {image_url}")
+
+        image_bytes = await self._download_image(image_url)
+
+        # Convert to base64
+        import base64
+        image_data = base64.b64encode(image_bytes).decode('utf-8')
 
         elapsed = time.time() - start_time
         logger.info(f"Successfully generated image (base64 data length: {len(image_data)}) in {elapsed:.2f}s")
@@ -139,12 +146,22 @@ class OpenAIClient:
             prompt=prompt,
             model=model,
             size=size,
-            n=1,
-            response_format="b64_json"
+            n=1
         )
 
-        # Extract base64 image data
-        edited_image = response.data[0].b64_json
+        # Extract image URL and download
+        if not response.data or len(response.data) == 0:
+            logger.error("No image data in response")
+            raise ValueError("No image generated")
+
+        edited_image_url = response.data[0].url
+        logger.info(f"Downloading edited image from: {edited_image_url}")
+
+        edited_image_bytes = await self._download_image(edited_image_url)
+
+        # Convert to base64
+        import base64
+        edited_image = base64.b64encode(edited_image_bytes).decode('utf-8')
         logger.info("Successfully edited image")
 
         return edited_image
