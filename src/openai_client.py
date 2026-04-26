@@ -31,13 +31,13 @@ class OpenAIClient:
         )
 
     async def generate_image(
-        self, prompt: str, model: str = "dall-e-3", quality: str = "auto"
+        self, prompt: str, model: str = "gpt-image-2", quality: str = "auto"
     ) -> str:
         """Generate an image using OpenAI Images API.
 
         Args:
             prompt: Text description of the image to generate
-            model: Model to use for generation (e.g., "dall-e-3", "dall-e-2")
+            model: Model to use for generation (e.g., "gpt-image-2", "gpt-image-1.5")
             quality: Image quality ("low", "medium", "high", or "auto")
 
         Returns:
@@ -103,7 +103,7 @@ class OpenAIClient:
         self,
         image_url: str,
         prompt: str,
-        model: str = "dall-e-2",
+        model: str = "gpt-image-1.5",
         quality: str = "auto",
         previous_response_id: Optional[str] = None,
     ) -> str:
@@ -112,7 +112,7 @@ class OpenAIClient:
         Args:
             image_url: Image URL or local file path
             prompt: Text description of the edits to make
-            model: Model to use for editing (dall-e-2)
+            model: Model to use for editing (gpt-image-1.5)
             quality: Image quality ("low", "medium", "high", or "auto")
             previous_response_id: Ignored (kept for compatibility)
 
