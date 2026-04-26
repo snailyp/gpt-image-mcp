@@ -38,7 +38,7 @@ async def generate_image(
             - metadata: dict with model, size, quality
             - error: error message if success is False
     """
-    config = ctx["config"]
+    config = ctx.fastmcp.context["config"]
 
     # Apply defaults from config
     model = model or config.openai.default_model

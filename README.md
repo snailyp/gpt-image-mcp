@@ -66,7 +66,7 @@ SERVER__TRANSPORT=stdio  # Options: stdio (local/MCP clients), sse (remote acces
 # SSE Configuration (for SSE transport)
 HTTP__HOST=0.0.0.0
 HTTP__PORT=8000
-HTTP__ENDPOINT=/mcp
+HTTP__ENDPOINT=/sse
 
 # Logging Configuration
 LOGGING__LEVEL=INFO

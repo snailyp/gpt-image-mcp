@@ -39,7 +39,7 @@ async def edit_image(
             - metadata: dict with model, size, quality
             - error: error message if success is False
     """
-    config = ctx["config"]
+    config = ctx.fastmcp.context["config"]
 
     # Validate image_input
     if not image_input:

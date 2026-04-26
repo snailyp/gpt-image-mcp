@@ -26,7 +26,7 @@ def get_server_info(ctx: Context) -> Dict[str, Any]:
             - supported_formats: List of supported output formats
             - config: Current configuration defaults
     """
-    config = ctx["config"]
+    config = ctx.fastmcp.context["config"]
 
     return {
         "name": config.server.name,
