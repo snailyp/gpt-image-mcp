@@ -1,9 +1,8 @@
-import logging
 import base64
-import httpx
-from typing import Optional
+import logging
 from urllib.parse import urljoin, urlparse
 
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +42,7 @@ class CloudflareUploader:
             image_bytes = base64.b64decode(base64_data)
 
             # 构造请求URL和参数
-            params = {
-                "authCode": self.auth_code,
-                "uploadNameType": "origin"
-            }
+            params = {"authCode": self.auth_code, "uploadNameType": "origin"}
             if self.upload_folder:
                 params["uploadFolder"] = self.upload_folder
 
@@ -56,10 +52,7 @@ class CloudflareUploader:
             # 发送POST请求
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    self.api_url,
-                    params=params,
-                    files=files,
-                    timeout=30.0
+                    self.api_url, params=params, files=files, timeout=30.0
                 )
                 response.raise_for_status()
 

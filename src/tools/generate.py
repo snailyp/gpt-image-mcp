@@ -1,8 +1,9 @@
 import logging
-from typing import Literal, Dict, Any
-from fastmcp import FastMCP, Context
-from src.tools.common import process_image_request
+from typing import Any, Dict, Literal
 
+from fastmcp import Context, FastMCP
+
+from src.tools.common import process_image_request
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,7 @@ async def generate_image(
     prompt: str,
     ctx: Context,
     model: str | None = None,
-    size: str | None = None,
-    quality: Literal["standard", "hd"] | None = None,
+    quality: Literal["low", "medium", "high", "auto"] | None = None,
     output_format: Literal["url", "file", "base64"] | None = None,
     output_path: str | None = None,
 ) -> Dict[str, Any]:
@@ -23,9 +23,8 @@ async def generate_image(
 
     Args:
         prompt: Text description of the image to generate
-        model: Model to use for generation (default: gpt-4o)
-        size: Image size (default: 1024x1024)
-        quality: Image quality: standard or hd (default: standard)
+        model: Model to use for generation (default: gpt-image-2)
+        quality: Image quality: low, medium, high, or auto (default: auto)
         output_format: Output format: url, file, or base64 (default: url)
         output_path: Optional custom path for file output
         ctx: FastMCP context containing configuration
@@ -35,14 +34,13 @@ async def generate_image(
             - success: bool indicating if operation succeeded
             - format: output format used
             - data: the image data (URL, file path, or base64 string)
-            - metadata: dict with model, size, quality
+            - metadata: dict with model, quality
             - error: error message if success is False
     """
     config = ctx.fastmcp.context["config"]
 
     # Apply defaults from config
     model = model or config.openai.default_model
-    size = size or config.image.default_size
     quality = quality or config.image.default_quality
     output_format = output_format or config.image.default_output_format
 
@@ -61,7 +59,7 @@ async def generate_image(
 
     async def api_call(client):
         return await client.generate_image(
-            prompt=prompt, model=model, size=size, quality=quality
+            prompt=prompt, model=model, quality=quality
         )
 
     return await process_image_request(
@@ -71,7 +69,6 @@ async def generate_image(
         output_format=output_format,
         output_path=output_path,
         model=model,
-        size=size,
         quality=quality,
         api_call=api_call,
         operation_name="Generating",

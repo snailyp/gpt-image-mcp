@@ -19,7 +19,6 @@ async def process_image_request(
     output_format: Literal["url", "file", "base64"],
     output_path: Optional[str],
     model: str,
-    size: str,
     quality: str,
     api_call: Callable[[OpenAIClient], Awaitable[str]],
     operation_name: str,
@@ -37,7 +36,6 @@ async def process_image_request(
         output_format: Output format - "url", "file", or "base64"
         output_path: Optional custom path for file output
         model: Model to use
-        size: Image size
         quality: Image quality
         api_call: Async callback function that takes OpenAIClient and returns base64 or URL
         operation_name: Name of the operation for logging (e.g., "Generating", "Editing")
@@ -50,7 +48,7 @@ async def process_image_request(
             - success: bool indicating if operation succeeded
             - format: output format used
             - data: the image data (URL, file path, or base64 string)
-            - metadata: dict with model, size, quality
+            - metadata: dict with model, quality
             - error: error message if success is False
     """
     # Validate API key
@@ -60,7 +58,7 @@ async def process_image_request(
 
     try:
         logger.info(f"{operation_name} image...")
-        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}, output_format={output_format}")
+        logger.debug(f"Parameters: model={model}, quality={quality}, output_format={output_format}")
         logger.info(f"Using timeout: {timeout}s")
 
         # Create OpenAI client
@@ -115,7 +113,6 @@ async def process_image_request(
             "data": result["data"],
             "metadata": {
                 "model": model,
-                "size": size,
                 "quality": quality
             }
         }

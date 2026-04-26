@@ -2,12 +2,11 @@
   "openai": {
     "api_key": "",
     "base_url": "https://api.openai.com/v1",
-    "default_model": "gpt-4o",
+    "default_model": "gpt-image-2",
     "timeout": 60
   },
   "image": {
-    "default_size": "1024x1024",
-    "default_quality": "standard",
+    "default_quality": "auto",
     "default_output_format": "url",
     "save_directory": "./images",
     "download_retry": 3

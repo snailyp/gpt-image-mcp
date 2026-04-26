@@ -1,22 +1,23 @@
 # OpenAI Image MCP Server
 
-A Model Context Protocol (MCP) server that provides image generation and editing capabilities using OpenAI's Responses API with the `image_generation` tool.
+A Model Context Protocol (MCP) server that provides image generation and editing capabilities using OpenAI's Images API.
 
 ## Features
 
-- **Text-to-Image Generation**: Create images from text prompts using GPT-4o or GPT-4-turbo
-- **Image Editing**: Modify existing images with natural language instructions
+- **Text-to-Image Generation**: Create images from text prompts using gpt-image models (gpt-image-2, gpt-image-1.5)
+- **Image Editing**: Modify existing images with natural language instructions using gpt-image 2
 - **Multiple Output Formats**: Return images as URLs, save to files, or encode as base64
+- **Cloudflare Integration**: Automatic upload to Cloudflare Images for persistent URLs
 - **Dual Transport Modes**: Run locally via stdio or remotely via SSE
 - **Flexible Configuration**: Environment variables, JSON config files, and CLI arguments
-- **Retry Mechanism**: Automatic retry for image downloads with configurable attempts
+- **Automatic Format Conversion**: Converts images to PNG format for editing operations
 
 ## Installation
 
 ### Prerequisites
 
 - Python 3.11 or higher
-- OpenAI API key with access to GPT-4o or GPT-4-turbo
+- OpenAI API key with access to gpt-image models (gpt-image-2 for generation, gpt-image-1.5 for editing)
 
 ### Install Dependencies
 
@@ -48,15 +49,15 @@ Edit `.env`:
 # OpenAI Configuration
 OPENAI__API_KEY=sk-your-api-key-here
 OPENAI__BASE_URL=https://api.openai.com/v1
-OPENAI__DEFAULT_MODEL=gpt-4o
+OPENAI__DEFAULT_MODEL=gpt-image-2
 OPENAI__TIMEOUT=60
 
 # Image Configuration
-IMAGE__DEFAULT_SIZE=1024x1024
-IMAGE__DEFAULT_QUALITY=standard
+IMAGE__DEFAULT_QUALITY=auto
 IMAGE__DEFAULT_OUTPUT_FORMAT=url
 IMAGE__SAVE_DIRECTORY=./images
 IMAGE__DOWNLOAD_RETRY=3
+IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE=true
 
 # Server Configuration
 SERVER__NAME=gpt-image-mcp
@@ -124,19 +125,17 @@ Options:
 
 ### generate_image
 
-Generate an image from a text prompt using OpenAI's Responses API.
+Generate an image from a text prompt using OpenAI's Images API.
 
 **Parameters:**
 
 - `prompt` (string, required): Text description of the image to generate
-- `model` (string, optional): Model to use (default: `gpt-4o`)
-  - Supported: `gpt-4o`, `gpt-4-turbo`
-- `size` (string, optional): Image dimensions (default: `1024x1024`)
-  - Supported: `1024x1024`, `1792x1024`, `1024x1792`
-- `quality` (string, optional): Image quality (default: `standard`)
-  - Options: `standard`, `hd`
+- `model` (string, optional): Model to use (default: `gpt-image-2`)
+  - Supported: `gpt-image-2`, `gpt-image-1.5`
+- `quality` (string, optional): Image quality (default: `auto`)
+  - Options: `low`, `medium`, `high`, `auto`
 - `output_format` (string, optional): Output format (default: `url`)
-  - `url`: Return the image URL
+  - `url`: Return Cloudflare image URL (if configured) or base64 data
   - `file`: Download and save to disk
   - `base64`: Return base64-encoded image data
 - `output_path` (string, optional): Custom file path when using `file` format
@@ -149,9 +148,8 @@ Generate an image from a text prompt using OpenAI's Responses API.
   "format": "url",
   "data": "https://...",
   "metadata": {
-    "model": "gpt-4o",
-    "size": "1024x1024",
-    "quality": "standard"
+    "model": "gpt-image-2",
+    "quality": "auto"
   }
 }
 ```
@@ -161,24 +159,23 @@ Generate an image from a text prompt using OpenAI's Responses API.
 ```json
 {
   "prompt": "a serene mountain landscape at sunset",
-  "model": "gpt-4o",
-  "size": "1024x1024",
-  "quality": "hd",
+  "model": "gpt-image-2",
+  "quality": "high",
   "output_format": "file"
 }
 ```
 
 ### edit_image
 
-Edit an existing image using a text prompt.
+Edit an existing image using a text prompt with gpt-image 2.
 
 **Parameters:**
 
-- `image_input` (string, required): URL or file path of the image to edit
+- `image_input` (string, required): URL or file path of the image to edit (automatically converted to PNG)
 - `prompt` (string, required): Text description of the desired changes
-- `model` (string, optional): Model to use (default: `gpt-4o`)
-- `size` (string, optional): Output image dimensions (default: `1024x1024`)
-- `quality` (string, optional): Image quality (default: `standard`)
+- `model` (string, optional): Model to use (default: `gpt-image-2`)
+  - Note: Only `gpt-image-1.5` supports image editing
+- `quality` (string, optional): Image quality (default: `auto`)
 - `output_format` (string, optional): Output format (default: `url`)
 - `output_path` (string, optional): Custom file path when using `file` format
 
@@ -190,9 +187,8 @@ Edit an existing image using a text prompt.
   "format": "url",
   "data": "https://...",
   "metadata": {
-    "model": "gpt-4o",
-    "size": "1024x1024",
-    "quality": "standard"
+    "model": "gpt-image-2",
+    "quality": "auto"
   }
 }
 ```
@@ -221,11 +217,10 @@ Get server information, configuration, and capabilities.
   "name": "gpt-image-mcp",
   "version": "1.0.0",
   "transport": "stdio",
-  "supported_models": ["gpt-4o", "gpt-4-turbo"],
+  "supported_models": ["gpt-image-2", "gpt-image-1.5"],
   "supported_formats": ["url", "file", "base64"],
   "config": {
-    "default_model": "gpt-4o",
-    "default_size": "1024x1024"
+    "default_model": "gpt-image-2"
   }
 }
 ```
@@ -271,11 +266,18 @@ IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE=true
 
 当`IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE=true`且配置了Cloudflare凭证时：
 
-- `output_format="url"`会自动上传图片到Cloudflare并返回URL
+- `output_format="url"`会自动上传图片到Cloudflare并返回持久化URL
 - `output_format="file"`会保存到本地文件
-- `output_format="base64"`会返回base64数据
+- `output_format="base64"`会返回base64编码数据
 
 如果未配置Cloudflare或上传失败，系统会自动降级返回base64数据。
+
+### 配置参数说明
+
+- `CLOUDFLARE__AUTH_CODE`: Cloudflare API认证码
+- `CLOUDFLARE__API_URL`: Cloudflare上传API地址
+- `CLOUDFLARE__UPLOAD_FOLDER`: 上传文件夹名称（可选）
+- `IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE`: 是否启用自动上传（默认: true）
 
 ### 故障排查
 
@@ -379,7 +381,6 @@ Common errors:
 - **Invalid API Key**: Check your `OPENAI_API_KEY` configuration
 - **Model Not Available**: Ensure you have access to the specified model
 - **Image Download Failed**: Check network connectivity and URL validity
-- **Invalid Size**: Use supported dimensions (1024x1024, 1792x1024, 1024x1792)
 
 ## Troubleshooting
 
@@ -391,9 +392,16 @@ Common errors:
 
 ### Image generation fails
 
-1. Confirm API key has access to GPT-4o or GPT-4-turbo
+1. Confirm API key has access to gpt-image models (gpt-image-2 or gpt-image-1.5)
 2. Check OpenAI API status
 3. Review logs for detailed error messages
+
+### Image editing fails
+
+1. Ensure the image is accessible (valid URL or file path)
+2. Verify the image format (automatically converted to PNG)
+3. Note: Only gpt-image-1.5 supports image editing
+4. Check that the image meets OpenAI's content policy requirements
 
 ### SSE mode not accessible
 
@@ -401,16 +409,34 @@ Common errors:
 2. Verify port is not in use: `netstat -an | grep 8000`
 3. Try binding to localhost: `--host 127.0.0.1`
 
-## Migration to fastmcp
+## Migration History
 
-This project has been migrated from the standard `mcp` library to `fastmcp` for improved developer experience and reduced boilerplate. The migration:
+### OpenAI Images API Migration
+
+This project has been migrated from OpenAI's Responses API to the Images API:
+
+- **Image Generation**: Now uses `client.images.generate()` with gpt-image models
+- **Image Editing**: Now uses `client.images.edit()` with gpt-image 2
+- **Quality Parameters**: Mapped to Images API format (low/medium/high/auto)
+- **Response Handling**: Supports both `b64_json` and `url` response formats
+- **Format Conversion**: Automatic PNG conversion for image editing operations
+
+Key commits:
+
+- `1c4445d`: Migrated generate_image to Images API
+- `d2c75e6`: Migrated edit_image to Images API
+- `fc93422`: Removed unsupported response_format parameter
+- `79c9600`: Mapped quality parameter values
+- `e9ed57e`: Handle both b64_json and url response formats
+
+### fastmcp Migration
+
+This project uses `fastmcp` for improved developer experience:
 
 - Simplified tool definitions using decorators
 - Reduced server code by ~150 lines
-- Replaced HTTP transport with SSE (Server-Sent Events)
+- SSE (Server-Sent Events) transport for remote access
 - Maintained all existing functionality and APIs
-
-For the migration design and implementation details, see `docs/superpowers/specs/2026-04-26-fastmcp-migration-design.md`.
 
 ## License
 

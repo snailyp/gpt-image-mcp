@@ -1,7 +1,8 @@
 import logging
-from typing import Optional, Dict, Any, List
-import openai
+from typing import Optional
 
+import httpx
+import openai
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +10,12 @@ logger = logging.getLogger(__name__)
 class OpenAIClient:
     """Client for OpenAI Responses API to generate and edit images."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1", timeout: int = 60):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.openai.com/v1",
+        timeout: int = 60,
+    ):
         """Initialize OpenAI client.
 
         Args:
@@ -18,68 +24,21 @@ class OpenAIClient:
             timeout: Request timeout in seconds
         """
         self.client = openai.AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout
+            api_key=api_key, base_url=base_url, timeout=timeout
         )
-        logger.info(f"Initialized OpenAI client with base_url={base_url}, timeout={timeout}s")
-
-    def _get_image_generation_tool(self) -> List[Dict[str, Any]]:
-        """Get the image generation tool definition.
-
-        Returns:
-            List containing the tool definition
-        """
-        return [{"type": "image_generation"}]
-
-    def _extract_image_data_from_response(self, response: Any) -> str:
-        """Extract base64 image data from OpenAI Responses API response.
-
-        Args:
-            response: OpenAI Responses API response object
-
-        Returns:
-            Base64-encoded image data
-
-        Raises:
-            ValueError: If no image data is found in the response
-        """
-        if not hasattr(response, 'output') or not response.output:
-            logger.error("No output in response")
-            raise ValueError("No image generated")
-
-        # Filter for image_generation_call outputs
-        image_outputs = [
-            output for output in response.output
-            if hasattr(output, 'type') and output.type == "image_generation_call"
-        ]
-
-        if not image_outputs:
-            logger.error("No image_generation_call in response output")
-            raise ValueError("No image generated")
-
-        # Get the result from the first image output
-        image_output = image_outputs[0]
-        if not hasattr(image_output, 'result') or not image_output.result:
-            logger.error("No result in image_generation_call output")
-            raise ValueError("No image generated")
-
-        return image_output.result
+        logger.info(
+            f"Initialized OpenAI client with base_url={base_url}, timeout={timeout}s"
+        )
 
     async def generate_image(
-        self,
-        prompt: str,
-        model: str = "gpt-4o",
-        size: str = "1024x1024",
-        quality: str = "standard"
+        self, prompt: str, model: str = "gpt-image-2", quality: str = "auto"
     ) -> str:
-        """Generate an image using OpenAI Responses API.
+        """Generate an image using OpenAI Images API.
 
         Args:
             prompt: Text description of the image to generate
-            model: Model to use for generation
-            size: Image size (e.g., "1024x1024", "1792x1024", "1024x1792")
-            quality: Image quality ("standard" or "hd")
+            model: Model to use for generation (e.g., "gpt-image-2", "gpt-image-1.5")
+            quality: Image quality ("low", "medium", "high", or "auto")
 
         Returns:
             Base64-encoded image data
@@ -90,20 +49,16 @@ class OpenAIClient:
             openai.APIConnectionError: If connection to API fails
         """
         import time
+
         start_time = time.time()
 
         logger.info(f"Generating image with prompt: {prompt[:50]}...")
-        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
+        logger.debug(f"Parameters: model={model}, quality={quality}")
 
-        # Get tool definition
-        tools = self._get_image_generation_tool()
-
-        # Call Responses API with error handling
+        # Call Images API with error handling
         try:
-            response = await self.client.responses.create(
-                model=model,
-                input=prompt,
-                tools=tools
+            response = await self.client.images.generate(
+                prompt=prompt, model=model, quality=quality
             )
         except openai.APIConnectionError as e:
             logger.error(f"Failed to connect to OpenAI API: {e}")
@@ -112,70 +67,206 @@ class OpenAIClient:
             logger.error(f"OpenAI API error: {e}")
             raise
 
-        # Extract base64 image data from response
-        image_data = self._extract_image_data_from_response(response)
+        # Extract image data from response
+        if not response.data or len(response.data) == 0:
+            logger.error("No image data in response")
+            raise ValueError("No image generated")
+
+        # Check if response has b64_json or url
+        image_obj = response.data[0]
+
+        if hasattr(image_obj, "b64_json") and image_obj.b64_json:
+            # Response already contains base64 data
+            logger.info("Received base64 image data directly from API")
+            image_data = image_obj.b64_json
+        elif hasattr(image_obj, "url") and image_obj.url:
+            # Response contains URL, download and convert to base64
+            image_url = image_obj.url
+            logger.info(f"Downloading generated image from: {image_url}")
+            image_bytes = await self._download_image(image_url)
+
+            # Convert to base64
+            import base64
+
+            image_data = base64.b64encode(image_bytes).decode("utf-8")
+        else:
+            logger.error("Response contains neither b64_json nor url")
+            raise ValueError("Invalid response format from API")
 
         elapsed = time.time() - start_time
-        logger.info(f"Successfully generated image (base64 data length: {len(image_data)}) in {elapsed:.2f}s")
+        logger.info(
+            f"Successfully generated image (base64 data length: {len(image_data)}) in {elapsed:.2f}s"
+        )
         return image_data
 
     async def edit_image(
         self,
-        image_data: str,
+        image_url: str,
         prompt: str,
-        model: str = "gpt-4o",
-        size: str = "1024x1024",
-        quality: str = "standard",
-        previous_response_id: Optional[str] = None
+        model: str = "gpt-image-1.5",
+        quality: str = "auto",
+        previous_response_id: Optional[str] = None,
     ) -> str:
-        """Edit an image using OpenAI Responses API.
+        """Edit an image using OpenAI Images API.
 
         Args:
-            image_data: Base64-encoded image data or image URL
+            image_url: Image URL or local file path
             prompt: Text description of the edits to make
-            model: Model to use for editing
-            size: Image size (e.g., "1024x1024", "1792x1024", "1024x1792")
-            quality: Image quality ("standard" or "hd")
-            previous_response_id: Optional ID of previous response for multi-turn editing
+            model: Model to use for editing (gpt-image-1.5)
+            quality: Image quality ("low", "medium", "high", or "auto")
+            previous_response_id: Ignored (kept for compatibility)
 
         Returns:
             Base64-encoded edited image data
 
         Raises:
-            ValueError: If no image is generated
-            openai.APIError: If the API request fails
-            openai.APIConnectionError: If connection to API fails
+            ValueError: If image cannot be loaded or processed
+            openai.APIError: If API call fails
         """
-        logger.info(f"Editing image with prompt: {prompt[:50]}...")
-        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
+        import os
+        from io import BytesIO
 
-        # Get tool definition
-        tools = self._get_image_generation_tool()
+        logger.info(f"Editing image with prompt: {prompt}")
 
-        # Prepare input with image reference
-        input_content = f"[Image: {image_data[:50]}...]\n{prompt}" if len(image_data) > 50 else f"[Image: {image_data}]\n{prompt}"
+        # Determine if input is URL or file path
+        if image_url.startswith(("http://", "https://")):
+            # Download from URL
+            image_bytes = await self._download_image(image_url)
+        else:
+            # Read from local file
+            if not os.path.exists(image_url):
+                raise ValueError(f"Image file not found: {image_url}")
 
-        # Call Responses API with error handling
+            logger.info(f"Reading image from file: {image_url}")
+            with open(image_url, "rb") as f:
+                image_bytes = f.read()
+
+        # Ensure PNG format (Images API requirement)
+        png_bytes = self._ensure_png_format(image_bytes)
+
+        # Create file-like object for upload
+        image_file = BytesIO(png_bytes)
+        image_file.name = "image.png"
+
+        # Call Images API
+        logger.info(f"Calling Images API edit with model={model}, quality={quality}")
+        response = await self.client.images.edit(
+            image=image_file, prompt=prompt, model=model, quality=quality, n=1
+        )
+
+        # Extract image data from response
+        if not response.data or len(response.data) == 0:
+            logger.error("No image data in response")
+            raise ValueError("No image generated")
+
+        # Check if response has b64_json or url
+        image_obj = response.data[0]
+
+        if hasattr(image_obj, "b64_json") and image_obj.b64_json:
+            # Response already contains base64 data
+            logger.info("Received base64 image data directly from API")
+            edited_image = image_obj.b64_json
+        elif hasattr(image_obj, "url") and image_obj.url:
+            # Response contains URL, download and convert to base64
+            edited_image_url = image_obj.url
+            logger.info(f"Downloading edited image from: {edited_image_url}")
+            edited_image_bytes = await self._download_image(edited_image_url)
+
+            # Convert to base64
+            import base64
+
+            edited_image = base64.b64encode(edited_image_bytes).decode("utf-8")
+        else:
+            logger.error("Response contains neither b64_json nor url")
+            raise ValueError("Invalid response format from API")
+
+        logger.info("Successfully edited image")
+        return edited_image
+
+    def _get_image_generation_tool(self):
+        """Temporary stub - will be removed in Task 5.
+
+        Raises:
+            NotImplementedError: Method deleted in Task 4, pending Task 5 reimplementation
+        """
+        raise NotImplementedError(
+            "_get_image_generation_tool() was removed in Task 4. "
+            "edit_image() will be reimplemented in Task 5."
+        )
+
+    def _extract_image_data_from_response(self, response):
+        """Temporary stub - will be removed in Task 5.
+
+        Raises:
+            NotImplementedError: Method deleted in Task 4, pending Task 5 reimplementation
+        """
+        raise NotImplementedError(
+            "_extract_image_data_from_response() was removed in Task 4. "
+            "edit_image() will be reimplemented in Task 5."
+        )
+
+    async def _download_image(self, url: str) -> bytes:
+        """Download image from URL.
+
+        Args:
+            url: Image URL to download
+
+        Returns:
+            Image data as bytes
+
+        Raises:
+            httpx.HTTPError: If download fails
+        """
+        logger.info(f"Downloading image from {url}")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=30.0)
+            response.raise_for_status()
+            logger.info(
+                f"Successfully downloaded image ({len(response.content)} bytes)"
+            )
+            return response.content
+
+    def _ensure_png_format(self, image_bytes: bytes) -> bytes:
+        """Ensure image is in PNG format, converting if necessary.
+
+        Args:
+            image_bytes: Image data as bytes
+
+        Returns:
+            PNG-formatted image data as bytes
+
+        Raises:
+            ValueError: If image cannot be processed
+        """
+        from io import BytesIO
+
+        from PIL import Image
+
         try:
-            request_params = {
-                "model": model,
-                "input": input_content,
-                "tools": tools
-            }
+            # Open image from bytes
+            img = Image.open(BytesIO(image_bytes))
 
-            # Add previous_response_id if provided for multi-turn editing
-            if previous_response_id:
-                request_params["previous_response_id"] = previous_response_id
+            # If already PNG, return as-is
+            if img.format == "PNG":
+                logger.debug("Image is already PNG format")
+                return image_bytes
 
-            response = await self.client.responses.create(**request_params)
-        except openai.APIConnectionError as e:
-            logger.error(f"Failed to connect to OpenAI API: {e}")
-            raise
-        except openai.APIError as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise
+            # Convert to PNG
+            logger.info(f"Converting image from {img.format} to PNG")
+            png_buffer = BytesIO()
 
-        # Extract base64 image data from response
-        edited_image_data = self._extract_image_data_from_response(response)
-        logger.info(f"Successfully edited image (base64 data length: {len(edited_image_data)})")
-        return edited_image_data
+            # Convert RGBA to RGB if necessary (PNG supports both)
+            if img.mode == "RGBA":
+                img.save(png_buffer, format="PNG")
+            else:
+                # Convert to RGB first for other modes
+                rgb_img = img.convert("RGB")
+                rgb_img.save(png_buffer, format="PNG")
+
+            png_bytes = png_buffer.getvalue()
+            logger.info(f"Successfully converted to PNG ({len(png_bytes)} bytes)")
+            return png_bytes
+
+        except Exception as e:
+            logger.error(f"Failed to process image: {e}")
+            raise ValueError(f"Cannot process image: {e}")
