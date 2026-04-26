@@ -29,8 +29,8 @@ class OpenAIClient:
         self,
         prompt: str,
         model: str = "dall-e-3",
-        size: str = "1024x1024",
-        quality: str = "standard"
+        size: Optional[str] = None,
+        quality: str = "auto"
     ) -> str:
         """Generate an image using OpenAI Images API.
 
@@ -65,12 +65,15 @@ class OpenAIClient:
 
         # Call Images API with error handling
         try:
-            response = await self.client.images.generate(
-                prompt=prompt,
-                model=model,
-                size=size,
-                quality=api_quality
-            )
+            kwargs = {
+                "prompt": prompt,
+                "model": model,
+                "quality": api_quality
+            }
+            if size is not None:
+                kwargs["size"] = size
+
+            response = await self.client.images.generate(**kwargs)
         except openai.APIConnectionError as e:
             logger.error(f"Failed to connect to OpenAI API: {e}")
             raise
@@ -112,8 +115,8 @@ class OpenAIClient:
         image_url: str,
         prompt: str,
         model: str = "dall-e-2",
-        size: str = "1024x1024",
-        quality: str = "standard",
+        size: Optional[str] = None,
+        quality: str = "auto",
         previous_response_id: Optional[str] = None
     ) -> str:
         """Edit an image using OpenAI Images API.
@@ -167,14 +170,17 @@ class OpenAIClient:
 
         # Call Images API
         logger.info(f"Calling Images API edit with model={model}, size={size}, quality={api_quality}")
-        response = await self.client.images.edit(
-            image=image_file,
-            prompt=prompt,
-            model=model,
-            size=size,
-            quality=api_quality,
-            n=1
-        )
+        kwargs = {
+            "image": image_file,
+            "prompt": prompt,
+            "model": model,
+            "quality": api_quality,
+            "n": 1
+        }
+        if size is not None:
+            kwargs["size"] = size
+
+        response = await self.client.images.edit(**kwargs)
 
         # Extract image data from response
         if not response.data or len(response.data) == 0:

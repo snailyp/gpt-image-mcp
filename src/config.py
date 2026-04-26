@@ -10,14 +10,14 @@ class OpenAIConfig(BaseModel):
     """OpenAI API configuration."""
     api_key: str = Field(default="")
     base_url: str = Field(default="https://api.openai.com/v1")
-    default_model: str = Field(default="gpt-4o")
+    default_model: str = Field(default="dall-e-3")
     timeout: int = Field(default=60)
 
 
 class ImageConfig(BaseModel):
     """Image generation configuration."""
-    default_size: str = Field(default="1024x1024")
-    default_quality: str = Field(default="standard")
+    default_size: Optional[str] = Field(default=None)
+    default_quality: str = Field(default="auto")
     default_output_format: str = Field(default="url")
     save_directory: str = Field(default="./images")
     download_retry: int = Field(default=3)

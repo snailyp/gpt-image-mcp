@@ -1,9 +1,10 @@
 import logging
-from typing import Optional, Literal, Dict, Any
+from typing import Any, Dict, Literal
+
 from fastmcp import Context
+
 from src.tools.common import process_image_request
 from src.tools.generate import mcp
-
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ async def edit_image(
     size: str | None = None,
     quality: Literal["standard", "hd"] | None = None,
     output_format: Literal["url", "file", "base64"] | None = None,
-    output_path: str | None = None
+    output_path: str | None = None,
 ) -> Dict[str, Any]:
     """Edit an existing image using OpenAI API based on a text prompt.
 
@@ -53,16 +54,19 @@ async def edit_image(
     output_format = output_format or config.image.default_output_format
 
     logger.info(f"Editing image with prompt: {prompt[:50]}...")
-    logger.debug(f"Parameters: image_input={image_input}, model={model}, size={size}, quality={quality}, output_format={output_format}")
+    logger.debug(
+        f"Parameters: image_input={image_input}, model={model}, size={size}, quality={quality}, output_format={output_format}"
+    )
 
     # Construct CloudflareConfig if credentials provided
     cloudflare_config = None
     if config.cloudflare.auth_code and config.cloudflare.api_url:
         from src.config import CloudflareConfig
+
         cloudflare_config = CloudflareConfig(
             auth_code=config.cloudflare.auth_code,
             api_url=config.cloudflare.api_url,
-            upload_folder=config.cloudflare.upload_folder
+            upload_folder=config.cloudflare.upload_folder,
         )
 
     async def api_call(client):
@@ -71,7 +75,7 @@ async def edit_image(
             prompt=prompt,
             model=model,
             size=size,
-            quality=quality
+            quality=quality,
         )
 
     return await process_image_request(
@@ -87,5 +91,5 @@ async def edit_image(
         operation_name="Editing",
         cloudflare_config=cloudflare_config,
         auto_upload_to_cloudflare=config.image.auto_upload_to_cloudflare,
-        timeout=config.openai.timeout
+        timeout=config.openai.timeout,
     )

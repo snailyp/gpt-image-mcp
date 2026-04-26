@@ -1,8 +1,9 @@
 import logging
-from typing import Literal, Dict, Any
-from fastmcp import FastMCP, Context
-from src.tools.common import process_image_request
+from typing import Any, Dict, Literal
 
+from fastmcp import Context, FastMCP
+
+from src.tools.common import process_image_request
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ async def generate_image(
 
     Args:
         prompt: Text description of the image to generate
-        model: Model to use for generation (default: gpt-4o)
+        model: Model to use for generation (default: gpt-image-2)
         size: Image size (default: 1024x1024)
         quality: Image quality: standard or hd (default: standard)
         output_format: Output format: url, file, or base64 (default: url)

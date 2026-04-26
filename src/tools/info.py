@@ -32,10 +32,10 @@ def get_server_info(ctx: Context) -> Dict[str, Any]:
         "name": config.server.name,
         "version": config.server.version,
         "transport": config.server.transport,
-        "supported_models": ["gpt-4o", "gpt-4-turbo"],
+        "supported_models": ["gpt-image-1", "gpt-image-1.5", "gpt-image-2"],
         "supported_formats": ["url", "file", "base64"],
         "config": {
             "default_model": config.openai.default_model,
-            "default_size": config.image.default_size
-        }
+            "default_size": config.image.default_size,
+        },
     }
