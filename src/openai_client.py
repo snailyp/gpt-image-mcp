@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, Dict, Any, List
 import openai
+import httpx
 
 
 logger = logging.getLogger(__name__)
@@ -179,3 +180,22 @@ class OpenAIClient:
         edited_image_data = self._extract_image_data_from_response(response)
         logger.info(f"Successfully edited image (base64 data length: {len(edited_image_data)})")
         return edited_image_data
+
+    async def _download_image(self, url: str) -> bytes:
+        """Download image from URL.
+
+        Args:
+            url: Image URL to download
+
+        Returns:
+            Image data as bytes
+
+        Raises:
+            httpx.HTTPError: If download fails
+        """
+        logger.info(f"Downloading image from {url}")
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=30.0)
+            response.raise_for_status()
+            logger.info(f"Successfully downloaded image ({len(response.content)} bytes)")
+            return response.content
