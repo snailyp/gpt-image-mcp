@@ -24,9 +24,7 @@ class OpenAIClient:
             timeout: Request timeout in seconds
         """
         self.client = openai.AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout
+            api_key=api_key, base_url=base_url, timeout=timeout
         )
         logger.info(
             f"Initialized OpenAI client with base_url={base_url}, timeout={timeout}s"
