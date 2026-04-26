@@ -1,43 +1,34 @@
 import logging
-from typing import Optional, Literal, Dict, Any
+from typing import Literal, Dict, Any
+from fastmcp import FastMCP, Context
 from src.tools.common import process_image_request
 
 
 logger = logging.getLogger(__name__)
 
+mcp = FastMCP("gpt-image-mcp")
 
-async def generate_image_tool(
+
+@mcp.tool()
+async def generate_image(
     prompt: str,
-    model: str = "gpt-4o",
-    size: str = "1024x1024",
-    quality: str = "standard",
-    output_format: Literal["url", "file", "base64"] = "url",
-    output_path: Optional[str] = None,
-    api_key: str = "",
-    base_url: str = "https://api.openai.com/v1",
-    save_directory: str = "./images",
-    cloudflare_auth_code: str = "",
-    cloudflare_api_url: str = "",
-    cloudflare_upload_folder: str = "",
-    auto_upload_to_cloudflare: bool = True
+    ctx: Context,
+    model: str | None = None,
+    size: str | None = None,
+    quality: Literal["standard", "hd"] | None = None,
+    output_format: Literal["url", "file", "base64"] | None = None,
+    output_path: str | None = None
 ) -> Dict[str, Any]:
-    """
-    Generate an image using OpenAI API and return it in the specified format.
+    """Generate an image using OpenAI API based on a text prompt.
 
     Args:
         prompt: Text description of the image to generate
-        model: Model to use for generation (default: "gpt-4o")
-        size: Image size (default: "1024x1024")
-        quality: Image quality "standard" or "hd" (default: "standard")
-        output_format: Output format - "url", "file", or "base64" (default: "url")
+        model: Model to use for generation (default: gpt-4o)
+        size: Image size (default: 1024x1024)
+        quality: Image quality: standard or hd (default: standard)
+        output_format: Output format: url, file, or base64 (default: url)
         output_path: Optional custom path for file output
-        api_key: OpenAI API key
-        base_url: Base URL for OpenAI API (default: "https://api.openai.com/v1")
-        save_directory: Directory to save images (default: "./images")
-        cloudflare_auth_code: Cloudflare authentication code
-        cloudflare_api_url: Cloudflare API URL
-        cloudflare_upload_folder: Cloudflare upload folder
-        auto_upload_to_cloudflare: Whether to auto-upload to Cloudflare when output_format is url
+        ctx: FastMCP context containing configuration
 
     Returns:
         Dictionary with:
@@ -47,16 +38,24 @@ async def generate_image_tool(
             - metadata: dict with model, size, quality
             - error: error message if success is False
     """
+    config = ctx["config"]
+
+    # Apply defaults from config
+    model = model or config.openai.default_model
+    size = size or config.image.default_size
+    quality = quality or config.image.default_quality
+    output_format = output_format or config.image.default_output_format
+
     logger.info(f"Generating image with prompt: {prompt[:50]}...")
 
     # Construct CloudflareConfig if credentials provided
     cloudflare_config = None
-    if cloudflare_auth_code and cloudflare_api_url:
+    if config.cloudflare.auth_code and config.cloudflare.api_url:
         from src.config import CloudflareConfig
         cloudflare_config = CloudflareConfig(
-            auth_code=cloudflare_auth_code,
-            api_url=cloudflare_api_url,
-            upload_folder=cloudflare_upload_folder
+            auth_code=config.cloudflare.auth_code,
+            api_url=config.cloudflare.api_url,
+            upload_folder=config.cloudflare.upload_folder
         )
 
     async def api_call(client):
@@ -68,9 +67,9 @@ async def generate_image_tool(
         )
 
     return await process_image_request(
-        api_key=api_key,
-        base_url=base_url,
-        save_directory=save_directory,
+        api_key=config.openai.api_key,
+        base_url=config.openai.base_url,
+        save_directory=config.image.save_directory,
         output_format=output_format,
         output_path=output_path,
         model=model,
@@ -79,5 +78,6 @@ async def generate_image_tool(
         api_call=api_call,
         operation_name="Generating",
         cloudflare_config=cloudflare_config,
-        auto_upload_to_cloudflare=auto_upload_to_cloudflare
+        auto_upload_to_cloudflare=config.image.auto_upload_to_cloudflare,
+        timeout=config.openai.timeout
     )
