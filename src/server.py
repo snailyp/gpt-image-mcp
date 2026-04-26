@@ -61,13 +61,13 @@ async def main():
 
     # Run with configured transport
     if config.server.transport == "stdio":
-        await mcp.run(transport="stdio")
+        await mcp.run_async(transport="stdio")
     elif config.server.transport in ("sse", "http"):
         # Map "http" to "sse" for backward compatibility
-        await mcp.run(
+        await mcp.run_async(
             transport="sse",
-            sse_host=config.http.host,
-            sse_port=config.http.port
+            host=config.http.host,
+            port=config.http.port
         )
     else:
         logger.error(f"Unsupported transport: {config.server.transport}")
