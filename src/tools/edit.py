@@ -1,45 +1,35 @@
 import logging
 from typing import Optional, Literal, Dict, Any
+from fastmcp import Context
 from src.tools.common import process_image_request
+from src.tools.generate import mcp
 
 
 logger = logging.getLogger(__name__)
 
 
-async def edit_image_tool(
+@mcp.tool()
+async def edit_image(
     image_input: str,
     prompt: str,
-    model: str = "gpt-4o",
-    size: str = "1024x1024",
-    quality: str = "standard",
-    output_format: Literal["url", "file", "base64"] = "url",
-    output_path: Optional[str] = None,
-    api_key: str = "",
-    base_url: str = "https://api.openai.com/v1",
-    save_directory: str = "./images",
-    cloudflare_auth_code: str = "",
-    cloudflare_api_url: str = "",
-    cloudflare_upload_folder: str = "",
-    auto_upload_to_cloudflare: bool = True
+    ctx: Context,
+    model: str | None = None,
+    size: str | None = None,
+    quality: Literal["standard", "hd"] | None = None,
+    output_format: Literal["url", "file", "base64"] | None = None,
+    output_path: str | None = None
 ) -> Dict[str, Any]:
-    """
-    Edit an image using OpenAI API and return it in the specified format.
+    """Edit an existing image using OpenAI API based on a text prompt.
 
     Args:
-        image_input: URL or path to the image to edit
-        prompt: Text description of the edits to make
-        model: Model to use for editing (default: "gpt-4o")
-        size: Image size (default: "1024x1024")
-        quality: Image quality "standard" or "hd" (default: "standard")
-        output_format: Output format - "url", "file", or "base64" (default: "url")
+        image_input: URL or file path of the image to edit
+        prompt: Text description of the desired changes
+        ctx: FastMCP context containing configuration
+        model: Model to use for editing (default: gpt-4o)
+        size: Output image dimensions (default: 1024x1024)
+        quality: Image quality: standard or hd (default: standard)
+        output_format: Output format: url, file, or base64 (default: url)
         output_path: Optional custom path for file output
-        api_key: OpenAI API key
-        base_url: Base URL for OpenAI API (default: "https://api.openai.com/v1")
-        save_directory: Directory to save images (default: "./images")
-        cloudflare_auth_code: Cloudflare authentication code
-        cloudflare_api_url: Cloudflare API URL
-        cloudflare_upload_folder: Cloudflare upload folder
-        auto_upload_to_cloudflare: Whether to auto-upload to Cloudflare when output_format is url
 
     Returns:
         Dictionary with:
@@ -49,22 +39,30 @@ async def edit_image_tool(
             - metadata: dict with model, size, quality
             - error: error message if success is False
     """
+    config = ctx["config"]
+
     # Validate image_input
     if not image_input:
         logger.error("Image input is required")
         return {"success": False, "error": "Image input is required"}
+
+    # Apply defaults from config
+    model = model or config.openai.default_model
+    size = size or config.image.default_size
+    quality = quality or config.image.default_quality
+    output_format = output_format or config.image.default_output_format
 
     logger.info(f"Editing image with prompt: {prompt[:50]}...")
     logger.debug(f"Parameters: image_input={image_input}, model={model}, size={size}, quality={quality}, output_format={output_format}")
 
     # Construct CloudflareConfig if credentials provided
     cloudflare_config = None
-    if cloudflare_auth_code and cloudflare_api_url:
+    if config.cloudflare.auth_code and config.cloudflare.api_url:
         from src.config import CloudflareConfig
         cloudflare_config = CloudflareConfig(
-            auth_code=cloudflare_auth_code,
-            api_url=cloudflare_api_url,
-            upload_folder=cloudflare_upload_folder
+            auth_code=config.cloudflare.auth_code,
+            api_url=config.cloudflare.api_url,
+            upload_folder=config.cloudflare.upload_folder
         )
 
     async def api_call(client):
@@ -77,9 +75,9 @@ async def edit_image_tool(
         )
 
     return await process_image_request(
-        api_key=api_key,
-        base_url=base_url,
-        save_directory=save_directory,
+        api_key=config.openai.api_key,
+        base_url=config.openai.base_url,
+        save_directory=config.image.save_directory,
         output_format=output_format,
         output_path=output_path,
         model=model,
@@ -88,5 +86,6 @@ async def edit_image_tool(
         api_call=api_call,
         operation_name="Editing",
         cloudflare_config=cloudflare_config,
-        auto_upload_to_cloudflare=auto_upload_to_cloudflare
+        auto_upload_to_cloudflare=config.image.auto_upload_to_cloudflare,
+        timeout=config.openai.timeout
     )
