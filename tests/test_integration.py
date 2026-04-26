@@ -365,3 +365,39 @@ async def test_full_workflow_with_custom_output_path():
             )
     finally:
         del os.environ["OPENAI__API_KEY"]
+
+
+@pytest.mark.asyncio
+async def test_generate_image_with_cloudflare_integration():
+    """Integration test for image generation with Cloudflare upload."""
+    from src.tools.generate import generate_image_tool
+
+    with patch('src.tools.common.OpenAIClient') as mock_client_class, \
+         patch('src.cloudflare_uploader.httpx.AsyncClient.post') as mock_post:
+
+        # Mock OpenAI client
+        mock_client = Mock()
+        mock_client.generate_image = AsyncMock(return_value="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+        mock_client_class.return_value = mock_client
+
+        # Mock Cloudflare response
+        mock_response = Mock()
+        mock_response.json.return_value = [{"src": "https://cdn.test.com/image.png"}]
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        # Call tool with Cloudflare config
+        result = await generate_image_tool(
+            prompt="A test image",
+            api_key="test_key",
+            output_format="url",
+            cloudflare_auth_code="test_auth",
+            cloudflare_api_url="https://api.test.com/upload",
+            cloudflare_upload_folder="test",
+            auto_upload_to_cloudflare=True
+        )
+
+        # Verify result
+        assert result["success"] is True
+        assert result["format"] == "url"
+        assert result["data"] == "https://cdn.test.com/image.png"
