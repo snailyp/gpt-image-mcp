@@ -199,3 +199,47 @@ class OpenAIClient:
             response.raise_for_status()
             logger.info(f"Successfully downloaded image ({len(response.content)} bytes)")
             return response.content
+
+    def _ensure_png_format(self, image_bytes: bytes) -> bytes:
+        """Ensure image is in PNG format, converting if necessary.
+
+        Args:
+            image_bytes: Image data as bytes
+
+        Returns:
+            PNG-formatted image data as bytes
+
+        Raises:
+            ValueError: If image cannot be processed
+        """
+        from PIL import Image
+        from io import BytesIO
+
+        try:
+            # Open image from bytes
+            img = Image.open(BytesIO(image_bytes))
+
+            # If already PNG, return as-is
+            if img.format == 'PNG':
+                logger.debug("Image is already PNG format")
+                return image_bytes
+
+            # Convert to PNG
+            logger.info(f"Converting image from {img.format} to PNG")
+            png_buffer = BytesIO()
+
+            # Convert RGBA to RGB if necessary (PNG supports both)
+            if img.mode == 'RGBA':
+                img.save(png_buffer, format='PNG')
+            else:
+                # Convert to RGB first for other modes
+                rgb_img = img.convert('RGB')
+                rgb_img.save(png_buffer, format='PNG')
+
+            png_bytes = png_buffer.getvalue()
+            logger.info(f"Successfully converted to PNG ({len(png_bytes)} bytes)")
+            return png_bytes
+
+        except Exception as e:
+            logger.error(f"Failed to process image: {e}")
+            raise ValueError(f"Cannot process image: {e}")
