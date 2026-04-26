@@ -36,6 +36,5 @@ def get_server_info(ctx: Context) -> Dict[str, Any]:
         "supported_formats": ["url", "file", "base64"],
         "config": {
             "default_model": config.openai.default_model,
-            "default_size": config.image.default_size,
         },
     }

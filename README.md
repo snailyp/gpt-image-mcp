@@ -48,12 +48,11 @@ Edit `.env`:
 # OpenAI Configuration
 OPENAI__API_KEY=sk-your-api-key-here
 OPENAI__BASE_URL=https://api.openai.com/v1
-OPENAI__DEFAULT_MODEL=gpt-4o
+OPENAI__DEFAULT_MODEL=gpt-image-2
 OPENAI__TIMEOUT=60
 
 # Image Configuration
-IMAGE__DEFAULT_SIZE=1024x1024
-IMAGE__DEFAULT_QUALITY=standard
+IMAGE__DEFAULT_QUALITY=auto
 IMAGE__DEFAULT_OUTPUT_FORMAT=url
 IMAGE__SAVE_DIRECTORY=./images
 IMAGE__DOWNLOAD_RETRY=3
@@ -129,12 +128,10 @@ Generate an image from a text prompt using OpenAI's Responses API.
 **Parameters:**
 
 - `prompt` (string, required): Text description of the image to generate
-- `model` (string, optional): Model to use (default: `gpt-4o`)
-  - Supported: `gpt-4o`, `gpt-4-turbo`
-- `size` (string, optional): Image dimensions (default: `1024x1024`)
-  - Supported: `1024x1024`, `1792x1024`, `1024x1792`
-- `quality` (string, optional): Image quality (default: `standard`)
-  - Options: `standard`, `hd`
+- `model` (string, optional): Model to use (default: `gpt-image-2`)
+  - Supported: `gpt-image-2`
+- `quality` (string, optional): Image quality (default: `auto`)
+  - Options: `low`, `medium`, `high`, `auto`
 - `output_format` (string, optional): Output format (default: `url`)
   - `url`: Return the image URL
   - `file`: Download and save to disk
@@ -149,9 +146,8 @@ Generate an image from a text prompt using OpenAI's Responses API.
   "format": "url",
   "data": "https://...",
   "metadata": {
-    "model": "gpt-4o",
-    "size": "1024x1024",
-    "quality": "standard"
+    "model": "gpt-image-2",
+    "quality": "auto"
   }
 }
 ```
@@ -162,8 +158,7 @@ Generate an image from a text prompt using OpenAI's Responses API.
 {
   "prompt": "a serene mountain landscape at sunset",
   "model": "gpt-4o",
-  "size": "1024x1024",
-  "quality": "hd",
+  "quality": "high",
   "output_format": "file"
 }
 ```
@@ -177,7 +172,6 @@ Edit an existing image using a text prompt.
 - `image_input` (string, required): URL or file path of the image to edit
 - `prompt` (string, required): Text description of the desired changes
 - `model` (string, optional): Model to use (default: `gpt-4o`)
-- `size` (string, optional): Output image dimensions (default: `1024x1024`)
 - `quality` (string, optional): Image quality (default: `standard`)
 - `output_format` (string, optional): Output format (default: `url`)
 - `output_path` (string, optional): Custom file path when using `file` format
@@ -191,8 +185,7 @@ Edit an existing image using a text prompt.
   "data": "https://...",
   "metadata": {
     "model": "gpt-4o",
-    "size": "1024x1024",
-    "quality": "standard"
+    "quality": "auto"
   }
 }
 ```
@@ -224,8 +217,7 @@ Get server information, configuration, and capabilities.
   "supported_models": ["gpt-4o", "gpt-4-turbo"],
   "supported_formats": ["url", "file", "base64"],
   "config": {
-    "default_model": "gpt-4o",
-    "default_size": "1024x1024"
+    "default_model": "gpt-image-2"
   }
 }
 ```
@@ -379,7 +371,6 @@ Common errors:
 - **Invalid API Key**: Check your `OPENAI_API_KEY` configuration
 - **Model Not Available**: Ensure you have access to the specified model
 - **Image Download Failed**: Check network connectivity and URL validity
-- **Invalid Size**: Use supported dimensions (1024x1024, 1792x1024, 1024x1792)
 
 ## Troubleshooting
 
