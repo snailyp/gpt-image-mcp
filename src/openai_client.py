@@ -92,6 +92,8 @@ class OpenAIClient:
     ) -> str:
         """Edit an image using OpenAI Responses API.
 
+        NOTE: This method is temporarily disabled pending Task 5 migration to Images API.
+
         Args:
             image_data: Base64-encoded image data or image URL
             prompt: Text description of the edits to make
@@ -104,43 +106,34 @@ class OpenAIClient:
             Base64-encoded edited image data
 
         Raises:
-            ValueError: If no image is generated
-            openai.APIError: If the API request fails
-            openai.APIConnectionError: If connection to API fails
+            NotImplementedError: Method temporarily disabled pending Task 5 implementation
         """
-        logger.info(f"Editing image with prompt: {prompt[:50]}...")
-        logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
+        raise NotImplementedError(
+            "edit_image() is temporarily disabled. "
+            "This method will be reimplemented using Images API in Task 5."
+        )
 
-        # Get tool definition
-        tools = self._get_image_generation_tool()
+    def _get_image_generation_tool(self):
+        """Temporary stub - will be removed in Task 5.
 
-        # Prepare input with image reference
-        input_content = f"[Image: {image_data[:50]}...]\n{prompt}" if len(image_data) > 50 else f"[Image: {image_data}]\n{prompt}"
+        Raises:
+            NotImplementedError: Method deleted in Task 4, pending Task 5 reimplementation
+        """
+        raise NotImplementedError(
+            "_get_image_generation_tool() was removed in Task 4. "
+            "edit_image() will be reimplemented in Task 5."
+        )
 
-        # Call Responses API with error handling
-        try:
-            request_params = {
-                "model": model,
-                "input": input_content,
-                "tools": tools
-            }
+    def _extract_image_data_from_response(self, response):
+        """Temporary stub - will be removed in Task 5.
 
-            # Add previous_response_id if provided for multi-turn editing
-            if previous_response_id:
-                request_params["previous_response_id"] = previous_response_id
-
-            response = await self.client.responses.create(**request_params)
-        except openai.APIConnectionError as e:
-            logger.error(f"Failed to connect to OpenAI API: {e}")
-            raise
-        except openai.APIError as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise
-
-        # Extract base64 image data from response
-        edited_image_data = self._extract_image_data_from_response(response)
-        logger.info(f"Successfully edited image (base64 data length: {len(edited_image_data)})")
-        return edited_image_data
+        Raises:
+            NotImplementedError: Method deleted in Task 4, pending Task 5 reimplementation
+        """
+        raise NotImplementedError(
+            "_extract_image_data_from_response() was removed in Task 4. "
+            "edit_image() will be reimplemented in Task 5."
+        )
 
     async def _download_image(self, url: str) -> bytes:
         """Download image from URL.
