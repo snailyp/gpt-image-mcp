@@ -54,13 +54,22 @@ class OpenAIClient:
         logger.info(f"Generating image with prompt: {prompt[:50]}...")
         logger.debug(f"Parameters: model={model}, size={size}, quality={quality}")
 
+        # Map quality parameter for compatibility
+        # Old values: "standard", "hd"
+        # New API values: "low", "medium", "high", "auto"
+        quality_map = {
+            "standard": "auto",
+            "hd": "high"
+        }
+        api_quality = quality_map.get(quality, quality)
+
         # Call Images API with error handling
         try:
             response = await self.client.images.generate(
                 prompt=prompt,
                 model=model,
                 size=size,
-                quality=quality
+                quality=api_quality
             )
         except openai.APIConnectionError as e:
             logger.error(f"Failed to connect to OpenAI API: {e}")
@@ -139,13 +148,21 @@ class OpenAIClient:
         image_file = BytesIO(png_bytes)
         image_file.name = "image.png"
 
+        # Map quality parameter for compatibility
+        quality_map = {
+            "standard": "auto",
+            "hd": "high"
+        }
+        api_quality = quality_map.get(quality, quality)
+
         # Call Images API
-        logger.info(f"Calling Images API edit with model={model}, size={size}")
+        logger.info(f"Calling Images API edit with model={model}, size={size}, quality={api_quality}")
         response = await self.client.images.edit(
             image=image_file,
             prompt=prompt,
             model=model,
             size=size,
+            quality=api_quality,
             n=1
         )
 
