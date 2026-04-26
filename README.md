@@ -228,6 +228,67 @@ Get server information, configuration, and capabilities.
 }
 ```
 
+## Cloudflare图床配置
+
+本服务支持将生成的图片自动上传到Cloudflare图床，获得持久化的URL。
+
+### 配置方法
+
+#### 环境变量配置
+
+在`.env`文件中添加：
+
+```bash
+# Cloudflare图床配置
+CLOUDFLARE__AUTH_CODE=your-auth-code-here
+CLOUDFLARE__API_URL=https://your-cloudflare-api.com/upload
+CLOUDFLARE__UPLOAD_FOLDER=mcp-images
+
+# 启用自动上传
+IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE=true
+```
+
+#### 配置文件
+
+在`config.json`中添加：
+
+```json
+{
+  "cloudflare": {
+    "auth_code": "your-auth-code-here",
+    "api_url": "https://your-cloudflare-api.com/upload",
+    "upload_folder": "mcp-images"
+  },
+  "image": {
+    "auto_upload_to_cloudflare": true
+  }
+}
+```
+
+### 工作原理
+
+当`IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE=true`且配置了Cloudflare凭证时：
+
+- `output_format="url"`会自动上传图片到Cloudflare并返回URL
+- `output_format="file"`会保存到本地文件
+- `output_format="base64"`会返回base64数据
+
+如果未配置Cloudflare或上传失败，系统会自动降级返回base64数据。
+
+### 故障排查
+
+#### 图片未上传到Cloudflare
+
+1. 检查`CLOUDFLARE__AUTH_CODE`和`CLOUDFLARE__API_URL`是否正确配置
+2. 检查`IMAGE__AUTO_UPLOAD_TO_CLOUDFLARE`是否设置为`true`
+3. 查看日志中的错误信息
+
+#### 上传失败
+
+1. 验证Cloudflare API地址是否可访问
+2. 确认认证码是否有效
+3. 检查网络连接
+
 ## Integration with MCP Clients
 
 ### Claude Desktop
