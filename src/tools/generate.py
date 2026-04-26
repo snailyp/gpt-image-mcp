@@ -17,7 +17,7 @@ async def generate_image(
     size: str | None = None,
     quality: Literal["standard", "hd"] | None = None,
     output_format: Literal["url", "file", "base64"] | None = None,
-    output_path: str | None = None
+    output_path: str | None = None,
 ) -> Dict[str, Any]:
     """Generate an image using OpenAI API based on a text prompt.
 
@@ -52,18 +52,16 @@ async def generate_image(
     cloudflare_config = None
     if config.cloudflare.auth_code and config.cloudflare.api_url:
         from src.config import CloudflareConfig
+
         cloudflare_config = CloudflareConfig(
             auth_code=config.cloudflare.auth_code,
             api_url=config.cloudflare.api_url,
-            upload_folder=config.cloudflare.upload_folder
+            upload_folder=config.cloudflare.upload_folder,
         )
 
     async def api_call(client):
         return await client.generate_image(
-            prompt=prompt,
-            model=model,
-            size=size,
-            quality=quality
+            prompt=prompt, model=model, size=size, quality=quality
         )
 
     return await process_image_request(
@@ -79,5 +77,5 @@ async def generate_image(
         operation_name="Generating",
         cloudflare_config=cloudflare_config,
         auto_upload_to_cloudflare=config.image.auto_upload_to_cloudflare,
-        timeout=config.openai.timeout
+        timeout=config.openai.timeout,
     )

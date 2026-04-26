@@ -24,7 +24,8 @@ async def process_image_request(
     api_call: Callable[[OpenAIClient], Awaitable[str]],
     operation_name: str,
     cloudflare_config: Optional['CloudflareConfig'] = None,
-    auto_upload_to_cloudflare: bool = True
+    auto_upload_to_cloudflare: bool = True,
+    timeout: int = 60
 ) -> Dict[str, Any]:
     """
     Common helper function for processing image generation and editing requests.
@@ -42,6 +43,7 @@ async def process_image_request(
         operation_name: Name of the operation for logging (e.g., "Generating", "Editing")
         cloudflare_config: Optional CloudflareConfig for uploading images
         auto_upload_to_cloudflare: Whether to auto-upload to Cloudflare when output_format is url
+        timeout: Request timeout in seconds
 
     Returns:
         Dictionary with:
@@ -59,9 +61,10 @@ async def process_image_request(
     try:
         logger.info(f"{operation_name} image...")
         logger.debug(f"Parameters: model={model}, size={size}, quality={quality}, output_format={output_format}")
+        logger.info(f"Using timeout: {timeout}s")
 
         # Create OpenAI client
-        client = OpenAIClient(api_key=api_key, base_url=base_url)
+        client = OpenAIClient(api_key=api_key, base_url=base_url, timeout=timeout)
 
         # Call the API (generate or edit) - returns base64 data or URL
         image_data = await api_call(client)
