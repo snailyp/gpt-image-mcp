@@ -4,12 +4,14 @@ import argparse
 import asyncio
 import logging
 
-from src.config import load_config
-from src.tools.generate import mcp
-
 # Import tool modules to register them with mcp instance
 import src.tools.edit  # noqa: F401
 import src.tools.info  # noqa: F401
+from src.config import load_config
+from src.tools.generate import mcp
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
+import uvicorn
 
 
 def setup_logging(
@@ -74,10 +76,62 @@ async def main():
     if config.server.transport == "stdio":
         await mcp.run_async(transport="stdio")
     elif config.server.transport in ("sse", "http"):
-        # Map "http" to "sse" for backward compatibility
-        await mcp.run_async(
-            transport="sse", host=config.http.host, port=config.http.port
+        # Determine actual transport type
+        actual_transport = "sse" if config.server.transport == "sse" else "http"
+
+        # Create HTTP app with CORS support
+        from starlette.applications import Starlette
+        from starlette.routing import Route, Mount
+        from starlette.responses import Response
+
+        # Create the base MCP app with specified transport
+        mcp_app = mcp.http_app(
+            transport=actual_transport,
         )
+
+        # Create CORS preflight handler
+        async def cors_preflight(request):
+            return Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "86400",
+                },
+            )
+
+        # Wrap the MCP app with CORS middleware
+        cors_middleware = Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        # Get the endpoint path based on transport type
+        endpoint_path = "/sse" if actual_transport == "sse" else "/mcp"
+
+        # Create wrapper app with OPTIONS route and MCP app's lifespan
+        app = Starlette(
+            routes=[
+                Route(endpoint_path, cors_preflight, methods=["OPTIONS"]),
+                Mount("/", app=mcp_app),
+            ],
+            middleware=[cors_middleware],
+            lifespan=mcp_app.lifespan,  # CRITICAL: Pass MCP app's lifespan
+        )
+
+        # Run with uvicorn
+        config_kwargs = {
+            "host": config.http.host,
+            "port": config.http.port,
+            "log_level": config.logging.level.lower(),
+        }
+
+        logger.info(f"Starting MCP server with {actual_transport} transport on http://{config.http.host}:{config.http.port}{endpoint_path}")
+        await uvicorn.Server(uvicorn.Config(app, **config_kwargs)).serve()
     else:
         logger.error(f"Unsupported transport: {config.server.transport}")
         raise ValueError(f"Unsupported transport: {config.server.transport}")
